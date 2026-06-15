@@ -1,94 +1,219 @@
 # Verification Checklist
 
-Checklist de todos os comandos de build/teste do projeto.
-**CONFIRMED** = rodei e confirmei nesta sessão de pair-programming.
-**PENDING** = requer ambiente local completo do usuário para verificar.
+**CONFIRMED** = rodei e confirmei em sessão de pair-programming.
+**PENDING** = requer ambiente local do usuário para verificar.
 
 ---
 
-## 1. Pré-requisitos (PENDING — rodar na ordem)
+## Setup passo a passo (do zero)
+
+Sequência completa para subir o projeto em uma máquina nova. Copie e cole em ordem.
+
+### Pré-requisitos
+
+| Ferramenta | Versão mínima | Como verificar |
+|---|---|---|
+| Go | 1.25 (exigido em `api/go.mod`) | `go version` |
+| Node.js | 18 LTS ou superior (Expo 52) | `node --version` |
+| Docker + Docker Compose | qualquer versão recente | `docker compose version` |
+
+---
+
+### 1. Clonar / entrar no repositório
 
 ```bash
-# Sobe o Postgres (porta 5432)
-# Diretório: raiz do projeto
-docker compose up -d
-
-# Copia o .env de exemplo e baixa dependências Go
-# Diretório: api/
-cp .env.example .env       # editar DATABASE_URL e JWT_SECRET se necessário
-go mod tidy
+# Se ainda não clonou:
+git clone <url-do-repo>
+cd foot_manager
 ```
 
 ---
 
-## 2. Backend — Go (`api/`)
+### 2. Subir o banco de dados
 
-| Comando | O que valida | Status |
-|---|---|---|
-| `go build ./...` | Compilação de todos os pacotes | **CONFIRMED OK** |
-| `go vet ./...` | Análise estática | **CONFIRMED OK** |
-| `go test ./...` | Testes unitários (auth, league, match) | **CONFIRMED OK** — 3 pacotes passaram |
-| `go run ./cmd/server` | Sobe a API na porta 8080 | **CONFIRMED** funcionou na sessão; migrations rodam automaticamente |
+```bash
+# Diretório: raiz do projeto (onde está o docker-compose.yml)
+docker compose up -d
+```
 
-> Nota: `internal/handler`, `internal/repository` e `internal/db` não têm arquivos de teste ainda.
+Aguardar o healthcheck ficar verde:
+
+```bash
+docker compose ps
+# STATUS deve ser "Up (healthy)" para o serviço "db"
+```
+
+Credenciais criadas pelo compose (já refletidas no `.env.example`):
+
+| Variável | Valor |
+|---|---|
+| host | `localhost:5432` |
+| user | `brassfoot` |
+| password | `brassfoot` |
+| database | `brassfoot` |
 
 ---
 
-## 3. Mobile — TypeScript (`mobile/`)
+### 3. Configurar e verificar o backend
 
-| Comando | O que valida | Status |
-|---|---|---|
-| `npx tsc --noEmit` | Checagem de tipos TypeScript | **CONFIRMED OK** — zero erros |
-| `npx expo start --web` | App no browser | **CONFIRMED** via preview tool (Expo web) |
-| `npx expo start --ios` | App no simulador iOS | **PENDING** — não testado nesta sessão |
-| `npx expo start --android` | App no emulador Android | **PENDING** — não testado nesta sessão |
+```bash
+# Diretório: api/
+cd api
+
+# Copiar o .env — os valores padrão já funcionam com o docker-compose acima
+cp .env.example .env
+# .env gerado:
+#   PORT=8080
+#   DATABASE_URL=postgres://brassfoot:brassfoot@localhost:5432/brassfoot?sslmode=disable
+#   JWT_SECRET=change_me_in_production  ← altere em produção
+
+# Baixar dependências Go
+go mod tidy
+
+# Checar compilação e análise estática (nenhuma saída = OK)
+go build ./...
+go vet ./...
+
+# Rodar testes unitários
+go test ./...
+# Esperado: ok em internal/auth, internal/league, internal/match
+```
 
 ---
 
-## 4. Fluxo E2E de Save/Load (PENDING — verificar manualmente)
+### 4. Subir a API (migrations automáticas)
 
-Com a API e o Expo web rodando, executar na ordem:
+```bash
+# Diretório: api/
+go run ./cmd/server
+```
+
+As migrations (`0001_init` → `0005_save_games`) são executadas **automaticamente** no startup via `golang-migrate` com arquivos embutidos no binário — não há comando separado.
+
+Verificar que a API está no ar:
+
+```bash
+# Outro terminal
+curl http://localhost:8080/health
+# Esperado: {"status":"ok"}
+```
+
+---
+
+### 5. Configurar e verificar o mobile
+
+```bash
+# Diretório: mobile/
+cd mobile
+
+# Instalar dependências (se node_modules ainda não existir)
+npm install
+
+# Checar tipos TypeScript (nenhuma saída = OK)
+npx tsc --noEmit
+```
+
+---
+
+### 6. Subir o app mobile
+
+Escolha a plataforma:
+
+```bash
+# Diretório: mobile/
+
+# Web (abre em http://localhost:19006 — testado em sessão)
+npm run web
+
+# iOS (requer Xcode e simulador instalados — PENDING, não testado em sessão)
+npm run ios
+
+# Android (requer Android Studio e emulador — PENDING, não testado em sessão)
+npm run android
+```
+
+---
+
+### 7. Autenticar para usar save/load (via UI)
 
 1. Abrir `http://localhost:19006` → aba **League**
-2. Escolher liga e clicar **Iniciar Temporada**
-3. Clicar **Jogar Rodada** algumas vezes
-4. Clicar **Salvar** — se não estiver logado, o modal de auth abre
-5. Cadastrar conta (ou entrar) no modal
-6. Confirmar mensagem verde "Save criado!"
-7. Clicar **Nova** para voltar à tela inicial
-8. Na seção **Carregar Save**, o save aparece com data; clicar **Carregar**
-9. Confirmar que a tabela volta idêntica ao estado salvo (rodada e pontos corretos)
-
-> Verificado via preview tool com usuário `matheus.test@brassfoot.com` na sessão — tabela restaurada corretamente para Rodada 3/6.
+2. Clicar em **Login para ver saves** ou **Salvar** → modal de auth abre
+3. Aba **Cadastrar**: preencher nome, e-mail e senha (mínimo 8 caracteres) → **Cadastrar**
+4. Na próxima vez: aba **Entrar** com o mesmo e-mail/senha
+5. O token JWT fica gravado no `localStorage` do browser e é enviado automaticamente em todas as requisições autenticadas
 
 ---
 
-## 5. Endpoints de save/load (curl de smoke test)
+### 8. Fluxo E2E de save/load (verificar manualmente)
+
+Com API e mobile rodando:
+
+1. **Iniciar Temporada** → escolher liga → a tabela aparece
+2. **Jogar Rodada** algumas vezes → anotar a classificação atual
+3. **Salvar** (header) → confirmar mensagem verde "Save criado!"
+4. **Nova** → voltar à tela inicial
+5. Seção **Carregar Save** → save aparece com data e país → clicar **Carregar**
+6. Confirmar que rodada e classificação voltam idênticos ao estado salvo
+
+> Verificado em sessão via Expo web — tabela restaurada corretamente para Rodada 3/6 com Riverside United liderando.
+
+---
+
+### 9. Smoke test dos endpoints via curl
 
 ```bash
-# Rodar com a API já no ar
+# Com a API no ar (http://localhost:8080)
 
-# Login
+# Cadastrar usuário
+curl -s -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Teste","email":"teste@brassfoot.com","password":"senha123"}'
+# Esperado: {"token":"...","manager":{...}}
+
+# Login e capturar token
 TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"SEU_EMAIL","password":"SUA_SENHA"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+  -d '{"email":"teste@brassfoot.com","password":"senha123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-# Criar liga
+# Criar liga (todos os times)
 LEAGUE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
-  -H "Content-Type: application/json" -d '{}' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+  -H "Content-Type: application/json" -d '{}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# Avançar 3 rodadas
+curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
+  -H "Content-Type: application/json" -d '{"rounds":3}'
 
 # Salvar
-curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/save \
-  -H "Authorization: Bearer $TOKEN"
-# Esperado: {"save_id":"<uuid>"}
+SAVE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/save \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['save_id'])")
+echo "Save ID: $SAVE_ID"
 
-# Listar saves
+# Listar saves do manager
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/saves
-# Esperado: array JSON com o save criado
+# Esperado: [{"id":"...","manager_id":"...","saved_at":"..."}]
 
-# Restaurar
-curl -s -X POST http://localhost:8080/api/v1/saves/<save_id>/restore
-# Esperado: {"league_id":"<hex>","league":{...}}
+# Restaurar save
+curl -s -X POST http://localhost:8080/api/v1/saves/$SAVE_ID/restore
+# Esperado: {"league_id":"...","league":{"next_round":4,"total_rounds":6,...}}
 ```
 
-> Todos estes endpoints foram verificados via curl na sessão e retornaram os resultados esperados.
+> Todos os endpoints acima verificados em sessão e retornaram resultados corretos.
+
+---
+
+## Resumo de status
+
+| Verificação | Diretório | Status |
+|---|---|---|
+| `go build ./...` | `api/` | **CONFIRMED OK** |
+| `go vet ./...` | `api/` | **CONFIRMED OK** |
+| `go test ./...` | `api/` | **CONFIRMED OK** — auth, league, match |
+| `go run ./cmd/server` + migrations | `api/` | **CONFIRMED OK** |
+| `npx tsc --noEmit` | `mobile/` | **CONFIRMED OK** — zero erros |
+| `npm run web` + fluxo save/load | `mobile/` | **CONFIRMED OK** via Expo web |
+| `npm run ios` | `mobile/` | **PENDING** — requer Xcode/simulador |
+| `npm run android` | `mobile/` | **PENDING** — requer Android Studio |
