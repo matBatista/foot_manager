@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go get *)",
+      "Bash(go mod *)",
+      "Bash(go build *)",
+      "Bash(docker compose *)",
+      "Bash(command -v podman colima orb)",
+      "Bash(pg_isready -h localhost -p 5432)",
+      "Bash(nc -z localhost 5432)",
+      "Bash(go vet *)",
+      "Bash(go test *)",
+      "Bash(command -v colima docker docker-compose)",
+      "Bash(brew install *)",
+      "Bash(colima start *)",
+      "Bash(/opt/homebrew/bin/brew --version)",
+      "Bash(/opt/homebrew/bin/brew install *)",
+      "Bash(/opt/homebrew/bin/colima start *)",
+      "Read(//opt/homebrew/Cellar/lima/2.1.2/bin/**)",
+      "Bash(PATH=/opt/homebrew/bin:__TRACKED_VAR__ colima start)",
+      "Bash(PATH=/opt/homebrew/bin:__TRACKED_VAR__ docker compose up -d)",
+      "Bash(PATH=/opt/homebrew/bin:__TRACKED_VAR__ docker compose ps)",
+      "Bash(curl -s -m 2 http://localhost:8080/health)",
+      "Bash(break)",
+      "Bash(npx tsc *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(npx expo *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8081/)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__get_page_text"
+    ]
+  }
+}

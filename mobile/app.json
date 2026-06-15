@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Brassfoot",
+    "slug": "brassfoot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "brassfoot",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.brassfoot.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.brassfoot.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset"
+    ]
+  }
+}
