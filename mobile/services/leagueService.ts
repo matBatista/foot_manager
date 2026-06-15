@@ -65,3 +65,36 @@ export async function simToEnd(id: string): Promise<AdvanceResponse> {
   const res = await api.post<AdvanceResponse>(`/api/v1/leagues/${id}/advance`, { to_end: true });
   return res.data;
 }
+
+// ---- save-game ----
+
+export interface SaveMeta {
+  id: string;
+  manager_id: string;
+  country: string;
+  saved_at: string;
+}
+
+export interface SaveResponse {
+  save_id: string;
+}
+
+export interface RestoreResponse {
+  league_id: string;
+  league: LeagueSummary;
+}
+
+export async function saveLeague(leagueId: string): Promise<SaveResponse> {
+  const res = await api.post<SaveResponse>(`/api/v1/leagues/${leagueId}/save`);
+  return res.data;
+}
+
+export async function listSaves(): Promise<SaveMeta[]> {
+  const res = await api.get<SaveMeta[]>('/api/v1/saves');
+  return res.data;
+}
+
+export async function restoreSave(saveId: string): Promise<RestoreResponse> {
+  const res = await api.post<RestoreResponse>(`/api/v1/saves/${saveId}/restore`);
+  return res.data;
+}

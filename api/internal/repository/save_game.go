@@ -19,6 +19,7 @@ var ErrSaveNotFound = errors.New("save not found")
 type SaveMeta struct {
 	ID        string    `json:"id"`
 	ManagerID string    `json:"manager_id"`
+	Country   string    `json:"country,omitempty"`
 	SavedAt   time.Time `json:"saved_at"`
 }
 
@@ -72,7 +73,8 @@ func (r *SaveGameRepository) Load(ctx context.Context, saveID string) (league.Le
 // ListByManager returns all saves for a manager, newest first.
 func (r *SaveGameRepository) ListByManager(ctx context.Context, managerID string) ([]SaveMeta, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, manager_id, saved_at FROM save_games WHERE manager_id = $1 ORDER BY saved_at DESC`,
+		`SELECT id, manager_id, COALESCE(season_json->>'country', ''), saved_at
+		 FROM save_games WHERE manager_id = $1 ORDER BY saved_at DESC`,
 		managerID,
 	)
 	if err != nil {
@@ -83,7 +85,7 @@ func (r *SaveGameRepository) ListByManager(ctx context.Context, managerID string
 	var out []SaveMeta
 	for rows.Next() {
 		var m SaveMeta
-		if err := rows.Scan(&m.ID, &m.ManagerID, &m.SavedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ManagerID, &m.Country, &m.SavedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

@@ -341,6 +341,25 @@ func (h *LeagueHandler) Save(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(saveResponse{SaveID: saveID})
 }
 
+// ListSaves returns all save metadata for the authenticated manager.
+func (h *LeagueHandler) ListSaves(c *fiber.Ctx) error {
+	if h.saves == nil {
+		return fiber.NewError(fiber.StatusServiceUnavailable, "save-game not configured")
+	}
+	managerID := middleware.ManagerID(c)
+	if managerID == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
+	}
+	saves, err := h.saves.ListByManager(c.Context(), managerID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to list saves")
+	}
+	if saves == nil {
+		saves = []repository.SaveMeta{}
+	}
+	return c.JSON(saves)
+}
+
 // Restore loads a save from the DB and registers it as a new in-memory league,
 // returning the new league ID and its summary.
 func (h *LeagueHandler) Restore(c *fiber.Ctx) error {

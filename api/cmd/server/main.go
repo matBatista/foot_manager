@@ -84,7 +84,8 @@ func main() {
 	leagues.Post("/:id/advance", leagueHandler.Advance)
 	leagues.Post("/:id/save", middleware.RequireAuth(jwtSecret), leagueHandler.Save)
 
-	// Save-game restore
+	// Save-game list & restore
+	v1.Get("/saves", middleware.RequireAuth(jwtSecret), leagueHandler.ListSaves)
 	v1.Post("/saves/:save_id/restore", leagueHandler.Restore)
 
 	port := os.Getenv("PORT")

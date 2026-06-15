@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,245 @@ import {
   ActivityIndicator,
   ScrollView,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import {
   LeagueSummary,
   TableRow,
   ResultRow,
+  SaveMeta,
   createLeague,
   getLeagueTable,
   advanceLeague,
   simToEnd,
+  saveLeague,
+  listSaves,
+  restoreSave,
 } from '../services/leagueService';
+import { login, register } from '../services/authService';
+import { useAuthStore } from '../store/authStore';
 
 const COUNTRIES = [
   { label: 'All Teams', value: '' },
   { label: 'Brazil', value: 'BR' },
   { label: 'England', value: 'EN' },
 ];
+
+// ---- Auth Modal ----
+
+interface AuthModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function AuthModal({ visible, onClose, onSuccess }: AuthModalProps) {
+  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const setToken = useAuthStore((s) => s.setToken);
+
+  function reset() {
+    setName('');
+    setEmail('');
+    setPassword('');
+    setError(null);
+    setLoading(false);
+  }
+
+  function switchTab(t: 'login' | 'register') {
+    setTab(t);
+    setError(null);
+  }
+
+  async function onSubmit() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = tab === 'login'
+        ? await login(email.trim(), password)
+        : await register(name.trim(), email.trim(), password);
+      setToken(res.token);
+      reset();
+      onSuccess();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Erro desconhecido';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!visible) return null;
+
+  return (
+    <View style={styles.modalOverlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      <View style={styles.modalCard}>
+        <Text style={styles.modalTitle}>Conta</Text>
+
+        {/* Tabs */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tab, tab === 'login' && styles.tabActive]}
+            onPress={() => switchTab('login')}
+          >
+            <Text style={[styles.tabText, tab === 'login' && styles.tabTextActive]}>Entrar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, tab === 'register' && styles.tabActive]}
+            onPress={() => switchTab('register')}
+          >
+            <Text style={[styles.tabText, tab === 'register' && styles.tabTextActive]}>Cadastrar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {tab === 'register' && (
+          <TextInput
+            style={styles.input}
+            placeholder="Nome"
+            placeholderTextColor="#64748b"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+          />
+        )}
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#64748b"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Senha (mín. 8 caracteres)"
+          placeholderTextColor="#64748b"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <TouchableOpacity
+          style={[styles.btn, loading && styles.btnDisabled]}
+          onPress={onSubmit}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#1a1a2e" />
+            : <Text style={styles.btnText}>{tab === 'login' ? 'Entrar' : 'Cadastrar'}</Text>
+          }
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.modalClose} onPress={onClose}>
+          <Text style={styles.modalCloseText}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ---- Saves List ----
+
+interface SavesListProps {
+  onRestore: (leagueId: string, leagueSummary: LeagueSummary, table: TableRow[]) => void;
+  onRequestAuth: () => void;
+}
+
+function SavesList({ onRestore, onRequestAuth }: SavesListProps) {
+  const token = useAuthStore((s) => s.token);
+  const [saves, setSaves] = useState<SaveMeta[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const fetchSaves = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setSaves(await listSaves());
+    } catch {
+      setError('Não foi possível carregar os saves.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchSaves();
+  }, [fetchSaves]);
+
+  async function onLoad(saveId: string) {
+    setRestoringId(saveId);
+    setError(null);
+    try {
+      const res = await restoreSave(saveId);
+      const tableRes = await getLeagueTable(res.league_id);
+      onRestore(res.league_id, tableRes.league, tableRes.table);
+    } catch {
+      setError('Falha ao carregar o save.');
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  if (!token) {
+    return (
+      <TouchableOpacity style={[styles.btn, styles.btnOutline, { marginTop: 8 }]} onPress={onRequestAuth}>
+        <Text style={[styles.btnText, styles.btnOutlineText]}>Login para ver saves</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  if (loading) {
+    return <ActivityIndicator color="#e2b96f" style={{ marginTop: 16 }} />;
+  }
+
+  if (saves.length === 0 && !error) {
+    return <Text style={[styles.muted, { marginTop: 8 }]}>Nenhum save encontrado.</Text>;
+  }
+
+  return (
+    <View style={styles.card}>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      {saves.map((s) => {
+        const date = new Date(s.saved_at).toLocaleString('pt-BR', {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        });
+        const label = s.country ? s.country : 'Global';
+        return (
+          <View key={s.id} style={styles.saveRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.saveLabel}>{label}</Text>
+              <Text style={styles.saveDate}>{date}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.saveBtn, restoringId === s.id && styles.btnDisabled]}
+              onPress={() => onLoad(s.id)}
+              disabled={restoringId !== null}
+            >
+              {restoringId === s.id
+                ? <ActivityIndicator color="#e2b96f" size="small" />
+                : <Text style={styles.saveBtnText}>Carregar</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---- Main Screen ----
 
 export default function LeagueScreen() {
   const [league, setLeague] = useState<LeagueSummary | null>(null);
@@ -31,6 +254,12 @@ export default function LeagueScreen() {
   const [selectedCountry, setSelectedCountry] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [pendingSave, setPendingSave] = useState(false);
+
+  const token = useAuthStore((s) => s.token);
 
   async function onCreateLeague() {
     setLoading(true);
@@ -42,7 +271,7 @@ export default function LeagueScreen() {
       setTable(tableRes.table);
       setLastResults([]);
     } catch {
-      setError('Could not start season. Is the API running?');
+      setError('Não foi possível iniciar a temporada. API está rodando?');
     } finally {
       setLoading(false);
     }
@@ -52,6 +281,7 @@ export default function LeagueScreen() {
     if (!league) return;
     setLoading(true);
     setError(null);
+    setSaveMsg(null);
     try {
       const res = toEnd
         ? await simToEnd(league.id)
@@ -60,18 +290,55 @@ export default function LeagueScreen() {
       setTable(res.table);
       setLastResults(res.results);
     } catch {
-      setError('Failed to advance season.');
+      setError('Falha ao avançar a temporada.');
     } finally {
       setLoading(false);
     }
   }, [league]);
 
+  async function onSave() {
+    if (!league) return;
+    if (!token) {
+      setPendingSave(true);
+      setAuthModalVisible(true);
+      return;
+    }
+    setSaveLoading(true);
+    setSaveMsg(null);
+    setError(null);
+    try {
+      await saveLeague(league.id);
+      setSaveMsg('Save criado!');
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? 'Falha ao salvar.';
+      setError(msg);
+    } finally {
+      setSaveLoading(false);
+    }
+  }
+
+  function onAuthSuccess() {
+    setAuthModalVisible(false);
+    if (pendingSave) {
+      setPendingSave(false);
+      onSave();
+    }
+  }
+
+  function onRestoreSuccess(leagueId: string, leagueSummary: LeagueSummary, restoredTable: TableRow[]) {
+    setLeague({ ...leagueSummary, id: leagueId });
+    setTable(restoredTable);
+    setLastResults([]);
+    setError(null);
+    setSaveMsg(null);
+  }
+
   if (!league) {
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.header}>New Season</Text>
-          <Text style={styles.sectionLabel}>Choose league</Text>
+          <Text style={styles.header}>Nova Temporada</Text>
+          <Text style={styles.sectionLabel}>Escolha a liga</Text>
           <View style={styles.chipRow}>
             {COUNTRIES.map((c) => (
               <TouchableOpacity
@@ -95,17 +362,29 @@ export default function LeagueScreen() {
           >
             {loading
               ? <ActivityIndicator color="#1a1a2e" />
-              : <Text style={styles.btnText}>Start Season</Text>
+              : <Text style={styles.btnText}>Iniciar Temporada</Text>
             }
           </TouchableOpacity>
+
+          <Text style={[styles.sectionLabel, { marginTop: 28 }]}>Carregar Save</Text>
+          <SavesList
+            onRestore={onRestoreSuccess}
+            onRequestAuth={() => setAuthModalVisible(true)}
+          />
         </ScrollView>
+
+        <AuthModal
+          visible={authModalVisible}
+          onClose={() => { setAuthModalVisible(false); setPendingSave(false); }}
+          onSuccess={onAuthSuccess}
+        />
       </SafeAreaView>
     );
   }
 
   const roundLabel = league.done
-    ? 'Season complete'
-    : `Round ${league.next_round - 1 > 0 ? league.next_round - 1 : '—'} / ${league.total_rounds}`;
+    ? 'Temporada concluída'
+    : `Rodada ${league.next_round - 1 > 0 ? league.next_round - 1 : '—'} / ${league.total_rounds}`;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -114,14 +393,31 @@ export default function LeagueScreen() {
         <View style={styles.seasonHeader}>
           <View>
             <Text style={styles.header}>
-              {league.country ? league.country : 'League'}
+              {league.country ? league.country : 'Liga'}
             </Text>
             <Text style={styles.subheader}>{roundLabel}</Text>
           </View>
-          <TouchableOpacity style={styles.resetBtn} onPress={() => setLeague(null)}>
-            <Text style={styles.resetBtnText}>New</Text>
-          </TouchableOpacity>
+          <View style={styles.headerBtns}>
+            <TouchableOpacity
+              style={[styles.saveHeaderBtn, saveLoading && styles.btnDisabled]}
+              onPress={onSave}
+              disabled={saveLoading}
+            >
+              {saveLoading
+                ? <ActivityIndicator color="#e2b96f" size="small" />
+                : <Text style={styles.saveHeaderBtnText}>Salvar</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={() => { setLeague(null); setSaveMsg(null); setError(null); }}
+            >
+              <Text style={styles.resetBtnText}>Nova</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {saveMsg && <Text style={styles.successText}>{saveMsg}</Text>}
 
         {/* Advance controls */}
         {!league.done && (
@@ -133,7 +429,7 @@ export default function LeagueScreen() {
             >
               {loading
                 ? <ActivityIndicator color="#1a1a2e" />
-                : <Text style={styles.btnText}>Play Round</Text>
+                : <Text style={styles.btnText}>Jogar Rodada</Text>
               }
             </TouchableOpacity>
             <TouchableOpacity
@@ -141,16 +437,16 @@ export default function LeagueScreen() {
               onPress={() => onAdvance(true)}
               disabled={loading}
             >
-              <Text style={[styles.btnText, styles.btnOutlineText]}>Sim Season</Text>
+              <Text style={[styles.btnText, styles.btnOutlineText]}>Sim. Temporada</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {league.done && (
           <View style={styles.doneCard}>
-            <Text style={styles.doneText}>Season finished!</Text>
+            <Text style={styles.doneText}>Temporada encerrada!</Text>
             <Text style={styles.doneSubtext}>
-              {table[0]?.name} wins the title
+              {table[0]?.name} vence o título
             </Text>
           </View>
         )}
@@ -161,7 +457,7 @@ export default function LeagueScreen() {
         {lastResults.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>
-              Round {lastResults[0]?.round} Results
+              Resultados — Rodada {lastResults[0]?.round}
             </Text>
             <View style={styles.card}>
               {lastResults.map((r, i) => (
@@ -172,17 +468,23 @@ export default function LeagueScreen() {
         )}
 
         {/* Standings table */}
-        <Text style={styles.sectionLabel}>Standings</Text>
+        <Text style={styles.sectionLabel}>Classificação</Text>
         <View style={styles.card}>
           <StandingsHeader />
           {table.map((row) => (
             <StandingRow key={row.team_id} row={row} />
           ))}
           {table.length === 0 && (
-            <Text style={styles.muted}>No results yet.</Text>
+            <Text style={styles.muted}>Sem resultados ainda.</Text>
           )}
         </View>
       </ScrollView>
+
+      <AuthModal
+        visible={authModalVisible}
+        onClose={() => { setAuthModalVisible(false); setPendingSave(false); }}
+        onSuccess={onAuthSuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -191,12 +493,12 @@ function StandingsHeader() {
   return (
     <View style={[styles.tableRow, styles.tableHeaderRow]}>
       <Text style={[styles.colPos, styles.colHeader]}>#</Text>
-      <Text style={[styles.colName, styles.colHeader]}>Team</Text>
+      <Text style={[styles.colName, styles.colHeader]}>Time</Text>
       <Text style={[styles.colStat, styles.colHeader]}>P</Text>
-      <Text style={[styles.colStat, styles.colHeader]}>W</Text>
+      <Text style={[styles.colStat, styles.colHeader]}>V</Text>
+      <Text style={[styles.colStat, styles.colHeader]}>E</Text>
       <Text style={[styles.colStat, styles.colHeader]}>D</Text>
-      <Text style={[styles.colStat, styles.colHeader]}>L</Text>
-      <Text style={[styles.colStat, styles.colHeader]}>GD</Text>
+      <Text style={[styles.colStat, styles.colHeader]}>SG</Text>
       <Text style={[styles.colPts, styles.colHeader]}>Pts</Text>
     </View>
   );
@@ -204,9 +506,8 @@ function StandingsHeader() {
 
 function StandingRow({ row }: { row: TableRow }) {
   const isTop = row.position <= 4;
-  const isBottom = false; // expand later with relegation zone logic
   return (
-    <View style={[styles.tableRow, isTop && styles.tableRowTop, isBottom && styles.tableRowBottom]}>
+    <View style={[styles.tableRow, isTop && styles.tableRowTop]}>
       <Text style={[styles.colPos, styles.cellText]}>{row.position}</Text>
       <Text style={[styles.colName, styles.cellText]} numberOfLines={1}>{row.name}</Text>
       <Text style={[styles.colStat, styles.cellText]}>{row.played}</Text>
@@ -240,7 +541,7 @@ function MatchResultRow({ result }: { result: ResultRow }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1a1a2e' },
+  safe: { flex: 1, backgroundColor: '#1a1a2e', position: 'relative' },
   container: { padding: 16, paddingBottom: 48 },
 
   header: { color: '#f1f5f9', fontSize: 26, fontWeight: 'bold' },
@@ -252,6 +553,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 16,
   },
+  headerBtns: { flexDirection: 'row', gap: 8, alignItems: 'center' },
 
   sectionLabel: {
     color: '#94a3b8',
@@ -302,6 +604,17 @@ const styles = StyleSheet.create({
   },
   resetBtnText: { color: '#94a3b8', fontSize: 13 },
 
+  saveHeaderBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2b96f',
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  saveHeaderBtnText: { color: '#e2b96f', fontSize: 13, fontWeight: '600' },
+
   doneCard: {
     backgroundColor: '#0f3460',
     borderRadius: 12,
@@ -312,7 +625,8 @@ const styles = StyleSheet.create({
   doneText: { color: '#e2b96f', fontSize: 18, fontWeight: 'bold' },
   doneSubtext: { color: '#f1f5f9', fontSize: 14, marginTop: 4 },
 
-  errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 12, fontSize: 14 },
+  errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 8, fontSize: 14 },
+  successText: { color: '#4ade80', textAlign: 'center', marginVertical: 8, fontSize: 14 },
   muted: { color: '#64748b', fontSize: 14, paddingVertical: 8 },
 
   card: {
@@ -332,7 +646,6 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: { backgroundColor: '#0f3460' },
   tableRowTop: { borderLeftWidth: 3, borderLeftColor: '#e2b96f' },
-  tableRowBottom: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
 
   colPos: { width: 22, textAlign: 'center' },
   colName: { flex: 1, paddingHorizontal: 6 },
@@ -363,4 +676,76 @@ const styles = StyleSheet.create({
     minWidth: 60,
     textAlign: 'center',
   },
+
+  // Auth modal
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 100,
+  },
+  modalCard: {
+    backgroundColor: '#16213e',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    color: '#f1f5f9',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#0f3460',
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center' },
+  tabActive: { backgroundColor: '#e2b96f' },
+  tabText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
+  tabTextActive: { color: '#1a1a2e' },
+  input: {
+    backgroundColor: '#0f3460',
+    color: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  modalClose: { marginTop: 10, alignItems: 'center' },
+  modalCloseText: { color: '#64748b', fontSize: 14 },
+
+  // Saves list
+  saveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a2e',
+  },
+  saveLabel: { color: '#f1f5f9', fontSize: 14, fontWeight: '600' },
+  saveDate: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  saveBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2b96f',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  saveBtnText: { color: '#e2b96f', fontSize: 13, fontWeight: '600' },
 });

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = __DEV__ ? 'http://localhost:8080' : 'https://api.brassfoot.com';
 
@@ -9,8 +10,10 @@ export const api = axios.create({
   },
 });
 
-// Attach auth token to every request
 api.interceptors.request.use((config) => {
-  // TODO: pull token from secure store
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
