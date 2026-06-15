@@ -19,16 +19,16 @@ import {
 } from '../services/leagueService';
 
 const COUNTRIES = [
-  { label: 'Brazil', value: 'Brazil' },
-  { label: 'England', value: 'England' },
   { label: 'All Teams', value: '' },
+  { label: 'Brazil', value: 'BR' },
+  { label: 'England', value: 'EN' },
 ];
 
 export default function LeagueScreen() {
   const [league, setLeague] = useState<LeagueSummary | null>(null);
   const [table, setTable] = useState<TableRow[]>([]);
   const [lastResults, setLastResults] = useState<ResultRow[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState('Brazil');
+  const [selectedCountry, setSelectedCountry] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

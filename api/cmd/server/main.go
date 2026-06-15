@@ -41,12 +41,13 @@ func main() {
 	playerRepo := repository.NewPlayerRepository(pool)
 	managerRepo := repository.NewManagerRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
+	saveGameRepo := repository.NewSaveGameRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
 	managerHandler := handler.NewManagerHandler(managerRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
-	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo)
+	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo)
 
 	app := fiber.New(fiber.Config{AppName: "Brassfoot API"})
 
@@ -81,6 +82,10 @@ func main() {
 	leagues.Get("/:id", leagueHandler.Get)
 	leagues.Get("/:id/table", leagueHandler.Table)
 	leagues.Post("/:id/advance", leagueHandler.Advance)
+	leagues.Post("/:id/save", middleware.RequireAuth(jwtSecret), leagueHandler.Save)
+
+	// Save-game restore
+	v1.Post("/saves/:save_id/restore", leagueHandler.Restore)
 
 	port := os.Getenv("PORT")
 	if port == "" {

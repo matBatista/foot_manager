@@ -9,18 +9,19 @@ import (
 
 	"github.com/brassfoot/api/internal/league"
 	"github.com/brassfoot/api/internal/match"
+	"github.com/brassfoot/api/internal/middleware"
 	"github.com/brassfoot/api/internal/model"
 	"github.com/brassfoot/api/internal/repository"
 	"github.com/gofiber/fiber/v2"
 )
 
-// LeagueHandler manages in-memory league simulations. State is intentionally
-// NOT persisted: a Season lives only in this registry and is lost on restart.
-// Persistence is deferred to the career/save-game feature so the schema is
-// designed once, properly. Until then this powers fast, throwaway seasons.
+// LeagueHandler manages in-memory league simulations. Seasons are optionally
+// persisted to Postgres via the SaveGameRepository (saves field). When saves
+// is nil, the Save/Restore endpoints return 503.
 type LeagueHandler struct {
 	teams   *repository.TeamRepository
 	players *repository.PlayerRepository
+	saves   *repository.SaveGameRepository
 
 	mu      sync.Mutex
 	leagues map[string]*leagueState
@@ -33,10 +34,11 @@ type leagueState struct {
 	country string
 }
 
-func NewLeagueHandler(teams *repository.TeamRepository, players *repository.PlayerRepository) *LeagueHandler {
+func NewLeagueHandler(teams *repository.TeamRepository, players *repository.PlayerRepository, saves *repository.SaveGameRepository) *LeagueHandler {
 	return &LeagueHandler{
 		teams:   teams,
 		players: players,
+		saves:   saves,
 		leagues: make(map[string]*leagueState),
 	}
 }
@@ -300,4 +302,74 @@ func newLeagueID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// ---- save-game handlers ----
+
+type saveResponse struct {
+	SaveID string `json:"save_id"`
+}
+
+// Save persists the in-memory league to the save_games table. Requires an
+// authenticated manager (manager ID is read from the JWT via RequireAuth).
+func (h *LeagueHandler) Save(c *fiber.Ctx) error {
+	if h.saves == nil {
+		return fiber.NewError(fiber.StatusServiceUnavailable, "save-game not configured")
+	}
+	id := c.Params("id")
+	managerID := middleware.ManagerID(c)
+	if managerID == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
+	}
+
+	h.mu.Lock()
+	st, ok := h.leagues[id]
+	h.mu.Unlock()
+	if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "league not found")
+	}
+
+	snap := league.LeagueSnapshot{
+		Country: st.country,
+		Names:   st.names,
+		Season:  st.season,
+	}
+	saveID, err := h.saves.Save(c.Context(), managerID, snap)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to save game")
+	}
+	return c.Status(fiber.StatusCreated).JSON(saveResponse{SaveID: saveID})
+}
+
+// Restore loads a save from the DB and registers it as a new in-memory league,
+// returning the new league ID and its summary.
+func (h *LeagueHandler) Restore(c *fiber.Ctx) error {
+	if h.saves == nil {
+		return fiber.NewError(fiber.StatusServiceUnavailable, "save-game not configured")
+	}
+	saveID := c.Params("save_id")
+
+	snap, err := h.saves.Load(c.Context(), saveID)
+	if errors.Is(err, repository.ErrSaveNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, "save not found")
+	}
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to load save")
+	}
+
+	st := &leagueState{
+		season:  snap.Season,
+		names:   snap.Names,
+		country: snap.Country,
+	}
+	leagueID := newLeagueID()
+
+	h.mu.Lock()
+	h.leagues[leagueID] = st
+	h.mu.Unlock()
+
+	return c.JSON(fiber.Map{
+		"league_id": leagueID,
+		"league":    summaryOf(leagueID, st),
+	})
 }
