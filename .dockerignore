@@ -1,0 +1,12 @@
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+api/bin/
+api/*.out
+api/*.test
+api/coverage.txt
+api/.env
+api/.env.*
+.git/
+.DS_Store
