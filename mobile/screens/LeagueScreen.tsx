@@ -156,10 +156,9 @@ function AuthModal({ visible, onClose, onSuccess }: AuthModalProps) {
 
 interface SavesListProps {
   onRestore: (leagueId: string, leagueSummary: LeagueSummary, table: TableRow[]) => void;
-  onRequestAuth: () => void;
 }
 
-function SavesList({ onRestore, onRequestAuth }: SavesListProps) {
+function SavesList({ onRestore }: SavesListProps) {
   const token = useAuthStore((s) => s.token);
   const [saves, setSaves] = useState<SaveMeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -199,9 +198,9 @@ function SavesList({ onRestore, onRequestAuth }: SavesListProps) {
 
   if (!token) {
     return (
-      <TouchableOpacity style={[styles.btn, styles.btnOutline, { marginTop: 8 }]} onPress={onRequestAuth}>
-        <Text style={[styles.btnText, styles.btnOutlineText]}>Login para ver saves</Text>
-      </TouchableOpacity>
+      <Text style={[styles.muted, { marginTop: 4 }]}>
+        Faça login acima para ver seus saves.
+      </Text>
     );
   }
 
@@ -242,6 +241,35 @@ function SavesList({ onRestore, onRequestAuth }: SavesListProps) {
         );
       })}
     </View>
+  );
+}
+
+// ---- Account Banner ----
+
+interface AccountBannerProps {
+  onLogin: () => void;
+}
+
+function AccountBanner({ onLogin }: AccountBannerProps) {
+  const token = useAuthStore((s) => s.token);
+  const clearToken = useAuthStore((s) => s.clearToken);
+
+  if (token) {
+    return (
+      <View style={styles.accountBanner}>
+        <Text style={styles.accountBannerText}>Conectado</Text>
+        <TouchableOpacity onPress={clearToken}>
+          <Text style={styles.accountBannerAction}>Sair</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity style={styles.loginBanner} onPress={onLogin}>
+      <Text style={styles.loginBannerText}>Entre para salvar e carregar jogos</Text>
+      <Text style={styles.loginBannerAction}>Fazer login →</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -338,6 +366,9 @@ export default function LeagueScreen() {
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.container}>
           <Text style={styles.header}>Nova Temporada</Text>
+
+          <AccountBanner onLogin={() => setAuthModalVisible(true)} />
+
           <Text style={styles.sectionLabel}>Escolha a liga</Text>
           <View style={styles.chipRow}>
             {COUNTRIES.map((c) => (
@@ -369,7 +400,6 @@ export default function LeagueScreen() {
           <Text style={[styles.sectionLabel, { marginTop: 28 }]}>Carregar Save</Text>
           <SavesList
             onRestore={onRestoreSuccess}
-            onRequestAuth={() => setAuthModalVisible(true)}
           />
         </ScrollView>
 
@@ -398,6 +428,14 @@ export default function LeagueScreen() {
             <Text style={styles.subheader}>{roundLabel}</Text>
           </View>
           <View style={styles.headerBtns}>
+            {!token && (
+              <TouchableOpacity
+                style={styles.resetBtn}
+                onPress={() => setAuthModalVisible(true)}
+              >
+                <Text style={[styles.resetBtnText, { color: '#e2b96f' }]}>Login</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.saveHeaderBtn, saveLoading && styles.btnDisabled]}
               onPress={onSave}
@@ -726,6 +764,31 @@ const styles = StyleSheet.create({
   },
   modalClose: { marginTop: 10, alignItems: 'center' },
   modalCloseText: { color: '#64748b', fontSize: 14 },
+
+  // Account banner
+  loginBanner: {
+    backgroundColor: '#0f3460',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  loginBannerText: { color: '#94a3b8', fontSize: 13, flex: 1 },
+  loginBannerAction: { color: '#e2b96f', fontSize: 13, fontWeight: '700', marginLeft: 8 },
+
+  accountBanner: {
+    backgroundColor: '#16213e',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  accountBannerText: { color: '#4ade80', fontSize: 13, fontWeight: '600' },
+  accountBannerAction: { color: '#94a3b8', fontSize: 13 },
 
   // Saves list
   saveRow: {
