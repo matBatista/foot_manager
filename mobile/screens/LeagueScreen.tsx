@@ -26,8 +26,8 @@ import { login, register } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 
 const COUNTRIES = [
-  { label: 'All Teams', value: '' },
-  { label: 'Brazil', value: 'BR' },
+  { label: 'Todos os Times', value: '' },
+  { label: 'Brasileirão', value: 'BR' },
   { label: 'England', value: 'EN' },
 ];
 

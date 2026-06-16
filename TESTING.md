@@ -88,7 +88,9 @@ go test ./...
 go run ./cmd/server
 ```
 
-As migrations (`0001_init` → `0005_save_games`) são executadas **automaticamente** no startup via `golang-migrate` com arquivos embutidos no binário — não há comando separado.
+As migrations (`0001_init` → `0006_seed_brasileirao`) são executadas **automaticamente** no startup via `golang-migrate` com arquivos embutidos no binário — não há comando separado.
+
+A migration `0006` insere 19 clubes reais do Campeonato Brasileiro Série A (country=`BR`). Combinada com o Brassfoot FC (migration `0002`), o banco passa a ter **20 times BR**, formando uma liga com 38 rodadas — idêntico ao formato real do Brasileirão.
 
 Verificar que a API está no ar:
 
@@ -157,6 +159,18 @@ Com API e mobile rodando:
 
 > Verificado em sessão via Expo web — tabela restaurada corretamente para Rodada 3/6 com Riverside United liderando.
 
+**Liga Brasileirão (BR):**
+```bash
+# Criar e simular temporada completa
+LEAGUE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
+  -H "Content-Type: application/json" -d '{"country":"BR"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
+  -H "Content-Type: application/json" -d '{"to_end":true}' \
+  | python3 -c "import sys,json; [print(r['position'], r['name'], r['points']) for r in json.load(sys.stdin)['table']]"
+```
+> Verificado — 20 times BR, 38 rodadas, nomes reais na tabela (Flamengo, Palmeiras, Botafogo, etc.).
+
 ---
 
 ### 9. Smoke test dos endpoints via curl
@@ -176,10 +190,15 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"email":"teste@brassfoot.com","password":"senha123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-# Criar liga (todos os times)
+# Criar liga Brasileirão (20 times BR, 38 rodadas)
 LEAGUE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
-  -H "Content-Type: application/json" -d '{}' \
+  -H "Content-Type: application/json" -d '{"country":"BR"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# Ou criar liga com todos os times (inclui EN e ES)
+# LEAGUE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
+#   -H "Content-Type: application/json" -d '{}' \
+#   | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # Avançar 3 rodadas
 curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
