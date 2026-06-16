@@ -42,12 +42,13 @@ func main() {
 	managerRepo := repository.NewManagerRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
 	saveGameRepo := repository.NewSaveGameRepository(pool)
+	activeLeagueRepo := repository.NewActiveLeagueRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
 	managerHandler := handler.NewManagerHandler(managerRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
-	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo)
+	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)
 
 	app := fiber.New(fiber.Config{AppName: "Brassfoot API"})
 

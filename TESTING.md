@@ -224,14 +224,59 @@ curl -s -X POST http://localhost:8080/api/v1/saves/$SAVE_ID/restore
 
 ---
 
+### 10. Persistência automática de liga (restart survival)
+
+A migration `0007_active_leagues` adiciona a tabela `active_leagues` (TEXT PK + JSONB). A API persiste o estado completo da liga a cada `POST /leagues` e a cada `POST /leagues/:id/advance`. Ao buscar uma liga que não está em memória, o servidor a carrega do banco automaticamente.
+
+```bash
+# Criar liga Brasileirão e avançar 3 rodadas
+LEAGUE_ID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
+  -H "Content-Type: application/json" -d '{"country":"BR"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
+  -H "Content-Type: application/json" -d '{"rounds":3}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('next_round:', d['league']['next_round'])"
+# next_round: 4
+
+# Verificar que a liga foi persistida no banco
+PGPASSWORD=brassfoot psql -h localhost -U brassfoot -d brassfoot \
+  -c "SELECT id, updated_at FROM active_leagues ORDER BY updated_at DESC LIMIT 1;"
+
+# --- Reiniciar a API (Ctrl+C ou kill) e subir novamente ---
+# go run ./cmd/server
+
+# GET após restart — deve retornar next_round: 4 (carregado do banco, sem save manual)
+curl -s http://localhost:8080/api/v1/leagues/$LEAGUE_ID \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('next_round:', d['next_round'])"
+# next_round: 4  ← estado sobreviveu ao restart
+
+# A tabela também persiste
+curl -s http://localhost:8080/api/v1/leagues/$LEAGUE_ID/table \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); [print(r['position'], r['name'], r['points']) for r in d['table'][:3]]"
+
+# Continuar avançando após restart
+curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
+  -H "Content-Type: application/json" -d '{"rounds":1}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('next_round:', d['league']['next_round'])"
+# next_round: 5
+```
+
+> **CONFIRMED** — testado em sessão: liga criada com 20 times BR, avançada 3 rodadas, servidor reiniciado; GET e tabela retornaram `next_round: 4` corretamente; advance para rodada 5 funcionou após restart.
+
+O fluxo manual de save-game (POST /:id/save → GET /saves → POST /saves/:save_id/restore) continua funcionando independente. Ligas restauradas via `/saves/:id/restore` também são automaticamente persistidas em `active_leagues`.
+
+---
+
 ## Resumo de status
 
 | Verificação | Diretório | Status |
 |---|---|---|
 | `go build ./...` | `api/` | **CONFIRMED OK** |
 | `go vet ./...` | `api/` | **CONFIRMED OK** |
-| `go test ./...` | `api/` | **CONFIRMED OK** — auth, league, match |
-| `go run ./cmd/server` + migrations | `api/` | **CONFIRMED OK** |
+| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler, league, match |
+| `go run ./cmd/server` + migrations (0001–0007) | `api/` | **CONFIRMED OK** |
+| liga persiste após restart (`active_leagues`) | `api/` | **CONFIRMED OK** |
 | `npx tsc --noEmit` | `mobile/` | **CONFIRMED OK** — zero erros |
 | `npm run web` + fluxo save/load | `mobile/` | **CONFIRMED OK** via Expo web |
 | `npm run ios` | `mobile/` | **PENDING** — requer Xcode/simulador |

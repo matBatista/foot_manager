@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/brassfoot/api/internal/league"
@@ -15,13 +16,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// LeagueHandler manages in-memory league simulations. Seasons are optionally
-// persisted to Postgres via the SaveGameRepository (saves field). When saves
-// is nil, the Save/Restore endpoints return 503.
+// activeLeagueStore is the persistence contract for automatic league state
+// durability. *repository.ActiveLeagueRepository satisfies it; a fake is used
+// in tests without a database.
+type activeLeagueStore interface {
+	Upsert(ctx context.Context, id string, snap league.LeagueSnapshot) error
+	Load(ctx context.Context, id string) (league.LeagueSnapshot, error)
+}
+
+// LeagueHandler manages in-memory league simulations backed by Postgres for
+// automatic durability (active field) and manual user saves (saves field).
+//
+// Durability design — cache-aside:
+//   - Create and Advance write to DB immediately after mutating memory.
+//   - Get, Table, and Advance try memory first; on miss they load from DB and
+//     re-populate the cache. This makes the server restart-transparent.
+//   - DB writes are best-effort: failures are logged but do not abort the
+//     request, so the API stays available even if the DB is momentarily slow.
 type LeagueHandler struct {
 	teams   *repository.TeamRepository
 	players *repository.PlayerRepository
 	saves   *repository.SaveGameRepository
+	active  activeLeagueStore // nil = no automatic persistence
 
 	mu      sync.Mutex
 	leagues map[string]*leagueState
@@ -34,11 +50,17 @@ type leagueState struct {
 	country string
 }
 
-func NewLeagueHandler(teams *repository.TeamRepository, players *repository.PlayerRepository, saves *repository.SaveGameRepository) *LeagueHandler {
+func NewLeagueHandler(
+	teams *repository.TeamRepository,
+	players *repository.PlayerRepository,
+	saves *repository.SaveGameRepository,
+	active activeLeagueStore,
+) *LeagueHandler {
 	return &LeagueHandler{
 		teams:   teams,
 		players: players,
 		saves:   saves,
+		active:  active,
 		leagues: make(map[string]*leagueState),
 	}
 }
@@ -46,9 +68,9 @@ func NewLeagueHandler(teams *repository.TeamRepository, players *repository.Play
 // ---- requests / responses ----
 
 type createLeagueRequest struct {
-	Country string   `json:"country"`   // optional: restrict to one country
-	TeamIDs []string `json:"team_ids"`  // optional: explicit teams (overrides country)
-	Seed    int64    `json:"seed"`      // optional: 0 = random
+	Country string   `json:"country"`  // optional: restrict to one country
+	TeamIDs []string `json:"team_ids"` // optional: explicit teams (overrides country)
+	Seed    int64    `json:"seed"`     // optional: 0 = random
 }
 
 type leagueSummary struct {
@@ -90,7 +112,7 @@ type resultResponse struct {
 // an explicit team list), loads their squads, and starts a season.
 func (h *LeagueHandler) Create(c *fiber.Ctx) error {
 	var req createLeagueRequest
-	_ = c.BodyParser(&req) // body is optional; ignore parse errors
+	_ = c.BodyParser(&req)
 
 	ctx := c.Context()
 	teams, err := h.resolveTeams(ctx, req)
@@ -123,39 +145,43 @@ func (h *LeagueHandler) Create(c *fiber.Ctx) error {
 	h.leagues[id] = st
 	h.mu.Unlock()
 
+	h.persist(ctx, id, st)
+
 	return c.Status(fiber.StatusCreated).JSON(summaryOf(id, st))
 }
 
 // Get returns a league's summary (round progress, team count).
 func (h *LeagueHandler) Get(c *fiber.Ctx) error {
 	id := c.Params("id")
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	st, ok := h.leagues[id]
+	st, ok := h.lookupOrLoad(c.Context(), id)
 	if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "league not found")
 	}
-	return c.JSON(summaryOf(id, st))
+	h.mu.Lock()
+	summary := summaryOf(id, st)
+	h.mu.Unlock()
+	return c.JSON(summary)
 }
 
 // Table returns the current standings.
 func (h *LeagueHandler) Table(c *fiber.Ctx) error {
 	id := c.Params("id")
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	st, ok := h.leagues[id]
+	st, ok := h.lookupOrLoad(c.Context(), id)
 	if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "league not found")
 	}
-	return c.JSON(fiber.Map{
+	h.mu.Lock()
+	resp := fiber.Map{
 		"league": summaryOf(id, st),
 		"table":  st.tableRows(),
-	})
+	}
+	h.mu.Unlock()
+	return c.JSON(resp)
 }
 
 type advanceRequest struct {
-	Rounds int  `json:"rounds"`  // how many rounds to play (default 1)
-	ToEnd  bool `json:"to_end"`  // play the rest of the season at once
+	Rounds int  `json:"rounds"` // how many rounds to play (default 1)
+	ToEnd  bool `json:"to_end"` // play the rest of the season at once
 }
 
 // Advance plays one or more rounds and returns the new results plus the updated
@@ -165,13 +191,19 @@ func (h *LeagueHandler) Advance(c *fiber.Ctx) error {
 	var req advanceRequest
 	_ = c.BodyParser(&req)
 
+	// load from DB if not in memory (transparent after restart)
+	if _, ok := h.lookupOrLoad(c.Context(), id); !ok {
+		return fiber.NewError(fiber.StatusNotFound, "league not found")
+	}
+
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	st, ok := h.leagues[id]
 	if !ok {
+		h.mu.Unlock()
 		return fiber.NewError(fiber.StatusNotFound, "league not found")
 	}
 	if st.season.Done() {
+		h.mu.Unlock()
 		return fiber.NewError(fiber.StatusConflict, "season is already complete")
 	}
 
@@ -185,11 +217,13 @@ func (h *LeagueHandler) Advance(c *fiber.Ctx) error {
 		return nil
 	}
 
+	var playErr error
 	switch {
 	case req.ToEnd:
 		for !st.season.Done() {
 			if err := advance(); err != nil {
-				return mapSimError(err)
+				playErr = err
+				break
 			}
 		}
 	default:
@@ -199,19 +233,84 @@ func (h *LeagueHandler) Advance(c *fiber.Ctx) error {
 		}
 		for i := 0; i < n && !st.season.Done(); i++ {
 			if err := advance(); err != nil {
-				return mapSimError(err)
+				playErr = err
+				break
 			}
 		}
 	}
 
+	// snapshot data for response before releasing the lock
+	summary := summaryOf(id, st)
+	results := st.resultRows(played)
+	table := st.tableRows()
+	h.mu.Unlock()
+
+	if playErr != nil {
+		return mapSimError(playErr)
+	}
+
+	// persist outside the lock (best-effort; st is only mutated while holding mu)
+	h.persist(c.Context(), id, st)
+
 	return c.JSON(fiber.Map{
-		"league":  summaryOf(id, st),
-		"results": st.resultRows(played),
-		"table":   st.tableRows(),
+		"league":  summary,
+		"results": results,
+		"table":   table,
 	})
 }
 
 // ---- helpers ----
+
+// lookupOrLoad returns the leagueState for id. It checks the in-memory cache
+// first; on a miss it tries the DB (cache-aside). The loaded state is added to
+// the cache so subsequent requests don't hit the DB.
+func (h *LeagueHandler) lookupOrLoad(ctx context.Context, id string) (*leagueState, bool) {
+	h.mu.Lock()
+	st, ok := h.leagues[id]
+	h.mu.Unlock()
+	if ok {
+		return st, true
+	}
+
+	if h.active == nil {
+		return nil, false
+	}
+
+	snap, err := h.active.Load(ctx, id)
+	if err != nil {
+		// ErrActiveLeagueNotFound is expected for unknown IDs; other errors are
+		// DB failures that we log and treat as a miss.
+		if !errors.Is(err, repository.ErrActiveLeagueNotFound) {
+			log.Printf("active league load error (id=%s): %v", id, err)
+		}
+		return nil, false
+	}
+
+	st = &leagueState{season: snap.Season, names: snap.Names, country: snap.Country}
+
+	h.mu.Lock()
+	// guard against a race where another goroutine loaded the same id
+	if existing, ok := h.leagues[id]; ok {
+		h.mu.Unlock()
+		return existing, true
+	}
+	h.leagues[id] = st
+	h.mu.Unlock()
+	return st, true
+}
+
+// persist writes the current leagueState to the DB. It is best-effort:
+// failures are logged but never surfaced to the caller, so a transient DB
+// hiccup doesn't break gameplay.
+func (h *LeagueHandler) persist(ctx context.Context, id string, st *leagueState) {
+	if h.active == nil {
+		return
+	}
+	snap := league.LeagueSnapshot{Country: st.country, Names: st.names, Season: st.season}
+	if err := h.active.Upsert(ctx, id, snap); err != nil {
+		log.Printf("active league persist error (id=%s): %v", id, err)
+	}
+}
 
 // resolveTeams turns the request into the set of teams to play: explicit IDs if
 // given, else all teams in a country, else every team.
@@ -322,9 +421,7 @@ func (h *LeagueHandler) Save(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
 	}
 
-	h.mu.Lock()
-	st, ok := h.leagues[id]
-	h.mu.Unlock()
+	st, ok := h.lookupOrLoad(c.Context(), id)
 	if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "league not found")
 	}
@@ -386,6 +483,9 @@ func (h *LeagueHandler) Restore(c *fiber.Ctx) error {
 	h.mu.Lock()
 	h.leagues[leagueID] = st
 	h.mu.Unlock()
+
+	// also persist to active_leagues so the restored session survives a restart
+	h.persist(c.Context(), leagueID, st)
 
 	return c.JSON(fiber.Map{
 		"league_id": leagueID,
