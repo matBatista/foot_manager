@@ -54,8 +54,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to process password")
 	}
 
-	// New managers take over the seeded club until team selection lands.
-	manager, err := h.managers.Create(c.Context(), req.Name, req.Email, hash, DefaultTeamID)
+	// New managers start without a team; they must select one via POST /api/v1/manager/team.
+	manager, err := h.managers.Create(c.Context(), req.Name, req.Email, hash, "")
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {

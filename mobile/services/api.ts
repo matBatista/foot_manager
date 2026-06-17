@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const BASE_URL = __DEV__ ? 'http://localhost:8080' : 'https://api.brassfoot.com';
+const BASE_URL = __DEV__ ? 'http://localhost:8080' : 'https://api.managerfc.com';
 
 export const api = axios.create({
   baseURL: BASE_URL,

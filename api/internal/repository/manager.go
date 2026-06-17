@@ -26,14 +26,35 @@ func scanManager(row pgx.CollectableRow) (model.Manager, error) {
 }
 
 // Create inserts a new manager and returns the stored record.
+// Pass an empty teamID to leave team_id NULL (manager must select a team later).
 func (r *ManagerRepository) Create(ctx context.Context, name, email, passwordHash, teamID string) (model.Manager, error) {
+	var tid interface{}
+	if teamID != "" {
+		tid = teamID
+	}
 	query := fmt.Sprintf(`INSERT INTO managers (name, email, password_hash, team_id)
 		VALUES ($1, $2, $3, $4) RETURNING %s`, managerColumns)
-	rows, err := r.pool.Query(ctx, query, name, email, passwordHash, teamID)
+	rows, err := r.pool.Query(ctx, query, name, email, passwordHash, tid)
 	if err != nil {
 		return model.Manager{}, fmt.Errorf("creating manager: %w", err)
 	}
 	return pgx.CollectOneRow(rows, scanManager)
+}
+
+// UpdateTeamID sets the manager's team. Pass an empty teamID to clear the assignment.
+func (r *ManagerRepository) UpdateTeamID(ctx context.Context, managerID, teamID string) error {
+	var tid interface{}
+	if teamID != "" {
+		tid = teamID
+	}
+	_, err := r.pool.Exec(ctx,
+		`UPDATE managers SET team_id = $1 WHERE id = $2`,
+		tid, managerID,
+	)
+	if err != nil {
+		return fmt.Errorf("updating manager team: %w", err)
+	}
+	return nil
 }
 
 // GetByEmail returns the manager with the given email, or pgx.ErrNoRows.

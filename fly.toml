@@ -1,7 +1,7 @@
-# Fly.io configuration for Brassfoot API
+# Fly.io configuration for ManagerFC API
 # Run `fly deploy` from the repo root.
 
-app            = "brassfoot-api"
+app            = "managerfc-api"
 primary_region = "gru"        # São Paulo — closest to Brazil
 
 [build]

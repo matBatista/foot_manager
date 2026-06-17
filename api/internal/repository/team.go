@@ -9,6 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// TeamWithStats extends Team with squad average overall for the team-picker UI.
+type TeamWithStats struct {
+	model.Team
+	AvgOverall int `json:"avg_overall"`
+}
+
 type TeamRepository struct {
 	pool *pgxpool.Pool
 }
@@ -63,6 +69,39 @@ func (r *TeamRepository) GetByID(ctx context.Context, id string) (model.Team, er
 		return model.Team{}, fmt.Errorf("querying team: %w", err)
 	}
 	return pgx.CollectOneRow(rows, scanTeam)
+}
+
+// ListForSelection returns all BR teams with computed avg_overall for the
+// team-picker screen, ordered by division (serie_a first) then name.
+func (r *TeamRepository) ListForSelection(ctx context.Context) ([]TeamWithStats, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.id, t.name, t.short_name, t.country, t.budget, t.division,
+		       COALESCE(ROUND(AVG(p.overall))::int, 0) AS avg_overall
+		FROM teams t
+		LEFT JOIN players p ON p.team_id = t.id
+		WHERE t.country = 'BR'
+		GROUP BY t.id
+		ORDER BY
+		  CASE t.division WHEN 'serie_a' THEN 0 ELSE 1 END,
+		  t.name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("querying teams for selection: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TeamWithStats
+	for rows.Next() {
+		var ts TeamWithStats
+		if err := rows.Scan(
+			&ts.ID, &ts.Name, &ts.ShortName, &ts.Country,
+			&ts.Budget, &ts.Division, &ts.AvgOverall,
+		); err != nil {
+			return nil, fmt.Errorf("scanning team: %w", err)
+		}
+		result = append(result, ts)
+	}
+	return result, rows.Err()
 }
 
 // UpdateDivision changes the division column for a team.

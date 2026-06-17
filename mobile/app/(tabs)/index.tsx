@@ -1,5 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTeamStore } from '../../store/teamStore';
+import { formatBudget } from '../../services/teamService';
 
 const MENU_ITEMS = [
   { label: '🏆  Liga', sub: 'Criar ou carregar uma temporada', route: '/league' },
@@ -10,13 +12,43 @@ const MENU_ITEMS = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const selectedTeam = useTeamStore((s) => s.selectedTeam);
 
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.title}>Brassfoot</Text>
+        <Text style={styles.title}>ManagerFC</Text>
         <Text style={styles.subtitle}>Sua carreira de treinador começa aqui</Text>
       </View>
+
+      {/* Team badge or selection prompt */}
+      {selectedTeam ? (
+        <TouchableOpacity
+          style={styles.teamBadge}
+          onPress={() => router.push('/select-team')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.teamBadgeIcon}>
+            <Text style={styles.teamBadgeShort}>{selectedTeam.shortName}</Text>
+          </View>
+          <View style={styles.teamBadgeInfo}>
+            <Text style={styles.teamBadgeName}>{selectedTeam.name}</Text>
+            <Text style={styles.teamBadgeMeta}>
+              {selectedTeam.division === 'serie_a' ? 'Série A' : 'Série B'} ·{' '}
+              {formatBudget(selectedTeam.budget)}
+            </Text>
+          </View>
+          <Text style={styles.teamBadgeChange}>Trocar</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.selectTeamCta}
+          onPress={() => router.push('/select-team')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.selectTeamCtaText}>⚽  Escolha seu time para começar</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.menu}>
         {MENU_ITEMS.map((item) => (
@@ -44,7 +76,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 24,
   },
   title: {
     fontSize: 38,
@@ -56,6 +88,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     marginTop: 6,
+  },
+  teamBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16213e',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#0f3460',
+  },
+  teamBadgeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: '#0f3460',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  teamBadgeShort: {
+    color: '#e2b96f',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  teamBadgeInfo: {
+    flex: 1,
+  },
+  teamBadgeName: {
+    color: '#f1f5f9',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  teamBadgeMeta: {
+    color: '#64748b',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  teamBadgeChange: {
+    color: '#e2b96f',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectTeamCta: {
+    backgroundColor: '#0f3460',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2b96f',
+  },
+  selectTeamCtaText: {
+    color: '#e2b96f',
+    fontSize: 15,
+    fontWeight: '700',
   },
   menu: {
     gap: 14,

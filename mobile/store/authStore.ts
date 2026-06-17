@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const TOKEN_KEY = 'brassfoot_auth_token';
+const TOKEN_KEY = 'managerfc_auth_token';
 
 function loadToken(): string | null {
   try {

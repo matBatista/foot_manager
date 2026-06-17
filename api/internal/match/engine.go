@@ -1,4 +1,4 @@
-// Package match contains Brassfoot's match simulation engine.
+// Package match contains ManagerFC's match simulation engine.
 //
 // The engine simulates a single 90-minute football match minute by minute.
 // Each team's strength is derived from its players' attributes, split into

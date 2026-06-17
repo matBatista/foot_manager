@@ -1,4 +1,4 @@
-# Roadmap — Brassfoot
+# Roadmap — ManagerFC
 
 Vision checklist of what's done and what's next. Sub-bullets only when an item needs context.
 

@@ -1,4 +1,4 @@
-# Brassfoot
+# ManagerFC
 
 A mobile football manager game where the user becomes a football manager.
 
@@ -11,7 +11,7 @@ A mobile football manager game where the user becomes a football manager.
 ## Project Structure
 
 ```
-Brassfoot/
+foot_manager/
 ├── mobile/     # React Native (Expo) — iOS & Android
 └── api/        # Go (Fiber) — REST API
 ```
@@ -33,7 +33,8 @@ Brassfoot/
 - Run the API: `cd api && cp .env.example .env && go mod tidy && go run ./cmd/server`
   - Migrations (embedded in `internal/db/migrations/`) run automatically on startup
 - Run the mobile app: `cd mobile && npx expo start`
-- Squad endpoint reads from Postgres; seed data lives in migration `0002_seed`
+- Squad endpoint reads from Postgres; Brassfoot FC was removed in migration `0012` — only real BR clubs remain
+- New managers start without a team and must select one via `POST /api/v1/manager/team` or the in-app picker
 
 ## Version control & multi-session workflow
 

@@ -11,6 +11,8 @@ import {
 import { Player, Position } from '../types/player';
 import { fetchSquad } from '../services/squadService';
 import { PlayerCard } from '../components/PlayerCard';
+import { useTeamStore } from '../store/teamStore';
+import { useAuthStore } from '../store/authStore';
 
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
 
@@ -19,13 +21,17 @@ export default function SquadScreen() {
   const [filter, setFilter] = useState<Position | 'ALL'>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const selectedTeam = useTeamStore((s) => s.selectedTeam);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
-    fetchSquad()
+    // When authenticated the server resolves team from JWT; otherwise pass team_id.
+    const teamId = token ? undefined : selectedTeam?.id;
+    fetchSquad(teamId)
       .then(setPlayers)
       .catch(() => setError('Could not load squad. Is the API running?'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token, selectedTeam?.id]);
 
   const filtered = filter === 'ALL'
     ? players

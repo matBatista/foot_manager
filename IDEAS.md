@@ -1,4 +1,4 @@
-# IDEAS — Brassfoot
+# IDEAS — ManagerFC
 
 Caderno de anotações. **Nada aqui está decidido** — são direções e observações soltas
 para discutir com calma depois. Quando uma ideia vira trabalho de fato, ela sobe para o
@@ -6,16 +6,14 @@ para discutir com calma depois. Quando uma ideia vira trabalho de fato, ela sobe
 
 ---
 
-## 1. Nome do projeto / marca
+## 1. Nome do projeto / marca ✅ DECIDIDO
 
-`Brassfoot / Brasfoot` foi questionado — pode não ser ideal para lançamento ou portfólio
-(*Bras Foot* já é marca registrada de uma série de jogos). Candidatos: Manager Esportivo,
-Manager Sport Club, Sports Manager e **ManagerFC** (favorito atual).
+**Nome escolhido: ManagerFC.** Candidatos avaliados foram: Brassfoot, Brasfoot, Manager
+Esportivo, Manager Sport Club, Sports Manager e ManagerFC. A escolha recaiu sobre ManagerFC
+por comunicar claramente o papel (manager) e o contexto esportivo (FC), funcionar em PT e EN,
+e não colidir com a marca registrada *Bras Foot*.
 
-Em aberto: comunica bem o escopo? PT, EN ou bilíngue? Público é BR ou recrutador
-internacional? Verificar disponibilidade nas stores, domínio e redes.
-
-→ Roadmap: [Open decisions — nome do projeto](ROADMAP.md#open-decisions)
+Implementado em: app.json (name/slug/scheme), telas mobile, AppName da API, docs e README.
 
 ---
 
@@ -71,4 +69,4 @@ secundária, modo claro+escuro, e como o verde convive com os ícones de cartão
 
 ---
 
-*Última atualização: 2026-06-17*
+*Última atualização: 2026-06-18*

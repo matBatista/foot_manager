@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "Brassfoot",
-    "slug": "brassfoot",
+    "name": "ManagerFC",
+    "slug": "managerfc",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "brassfoot",
+    "scheme": "managerfc",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.brassfoot.app"
+      "bundleIdentifier": "com.managerfc.app"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a2e"
       },
-      "package": "com.brassfoot.app"
+      "package": "com.managerfc.app"
     },
     "plugins": [
       "expo-router",

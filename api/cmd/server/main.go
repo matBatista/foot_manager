@@ -47,14 +47,14 @@ func main() {
 	careerRepo := repository.NewCareerRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
-	managerHandler := handler.NewManagerHandler(managerRepo)
+	managerHandler := handler.NewManagerHandler(managerRepo, teamRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
 	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)
 	marketHandler := handler.NewMarketHandler(transferRepo)
 	careerHandler := handler.NewCareerHandler(careerRepo, managerRepo, teamRepo, playerRepo, leagueHandler)
 
-	app := fiber.New(fiber.Config{AppName: "Brassfoot API"})
+	app := fiber.New(fiber.Config{AppName: "ManagerFC API"})
 
 	app.Use(logger.New())
 	app.Use(cors.New())
@@ -71,12 +71,14 @@ func main() {
 
 	// Manager
 	v1.Get("/manager/me", middleware.RequireAuth(jwtSecret), managerHandler.Me)
+	v1.Post("/manager/team", middleware.RequireAuth(jwtSecret), managerHandler.SelectTeam)
 
-	// Squad (manager's team when authenticated, default team otherwise)
+	// Squad (manager's team when authenticated, or ?team_id=<uuid> otherwise)
 	v1.Get("/squad", middleware.OptionalAuth(jwtSecret), squadHandler.GetSquad)
 
 	// Teams
 	v1.Get("/teams", teamHandler.List)
+	v1.Get("/teams/for-selection", teamHandler.ListForSelection)
 
 	// Match
 	v1.Post("/match/simulate", matchHandler.Simulate)

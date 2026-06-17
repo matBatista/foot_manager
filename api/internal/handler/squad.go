@@ -6,10 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// DefaultTeamID is the seeded team, used for unauthenticated requests and as
-// the starting club for new managers until team selection lands.
-const DefaultTeamID = "00000000-0000-0000-0000-000000000001"
-
 type SquadHandler struct {
 	players  *repository.PlayerRepository
 	managers *repository.ManagerRepository
@@ -19,15 +15,25 @@ func NewSquadHandler(players *repository.PlayerRepository, managers *repository.
 	return &SquadHandler{players: players, managers: managers}
 }
 
-// GetSquad returns the authenticated manager's squad, or the default team's
-// squad for unauthenticated requests.
+// GetSquad returns the squad for the authenticated manager's team.
+// Unauthenticated callers may pass ?team_id=<uuid> to view any team's squad.
+// Returns an empty squad when no team can be resolved.
 func (h *SquadHandler) GetSquad(c *fiber.Ctx) error {
-	teamID := DefaultTeamID
+	var teamID string
+
 	if managerID := middleware.ManagerID(c); managerID != "" {
 		manager, err := h.managers.GetByID(c.Context(), managerID)
-		if err == nil && manager.TeamID != "" {
+		if err == nil {
 			teamID = manager.TeamID
 		}
+	}
+
+	if teamID == "" {
+		teamID = c.Query("team_id")
+	}
+
+	if teamID == "" {
+		return c.JSON(fiber.Map{"players": []struct{}{}, "total": 0})
 	}
 
 	squad, err := h.players.ListByTeam(c.Context(), teamID)

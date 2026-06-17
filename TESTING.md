@@ -88,9 +88,9 @@ go test ./...
 go run ./cmd/server
 ```
 
-As migrations (`0001_init` → `0006_seed_brasileirao`) são executadas **automaticamente** no startup via `golang-migrate` com arquivos embutidos no binário — não há comando separado.
+As migrations (`0001_init` → `0012_remove_brassfoot_fc`) são executadas **automaticamente** no startup via `golang-migrate` com arquivos embutidos no binário — não há comando separado.
 
-A migration `0006` insere 19 clubes reais do Campeonato Brasileiro Série A (country=`BR`). Combinada com o Brassfoot FC (migration `0002`), o banco passa a ter **20 times BR**, formando uma liga com 38 rodadas — idêntico ao formato real do Brasileirão.
+A migration `0006` insere 19 clubes reais da Série A. A `0011` insere 20 clubes da Série B. A `0012` remove o Brassfoot FC fictício — o banco passa a ter **40 times BR reais** (20 Série A + 20 Série B).
 
 Verificar que a API está no ar:
 
@@ -173,45 +173,72 @@ curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
 
 ---
 
-### 9. Transfer Market — smoke test via curl
+### 9. Seleção de time + Transfer Market — smoke test via curl
 
 ```bash
-# Com a API no ar e usuário registrado/logado (TOKEN da seção anterior):
+# Com a API no ar — registrar manager e selecionar time
 
-# 1. Ver orçamento atual
+# 1. Registrar (novo manager começa SEM time)
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Teste Manager","email":"smoke@managerfc.com","password":"senha123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+echo "Token: $TOKEN"
+
+# 2. Confirmar que team_id está vazio
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/manager/me
+# Esperado: {"team_id":"", ...}
+
+# 3. Listar times disponíveis para seleção (Série A primeiro)
+curl -s http://localhost:8080/api/v1/teams/for-selection \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); [print(t['division'], t['name'], t['avg_overall'], t['budget']) for t in d['teams'][:5]]"
+# Esperado: 5 times da Série A com avg_overall > 0
+
+# 4. Selecionar Flamengo
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"team_id":"00000000-0000-0000-0000-000000000010"}' \
+  http://localhost:8080/api/v1/manager/team
+# Esperado: manager com team_id = Flamengo
+
+# 5. Ver elenco do time selecionado
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/squad \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Elenco: {d[\"total\"]} jogadores')"
+# Esperado: 12 jogadores do Flamengo
+
+# 6. Ver elenco sem auth, via ?team_id
+curl -s "http://localhost:8080/api/v1/squad?team_id=00000000-0000-0000-0000-000000000010" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Sem auth: {d[\"total\"]} jogadores')"
+# Esperado: 12 jogadores
+
+# 7. Confirmar que Brassfoot FC NÃO existe mais
+curl -s "http://localhost:8080/api/v1/squad?team_id=00000000-0000-0000-0000-000000000001" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'BFC squad: {d[\"total\"]}')"
+# Esperado: 0 (time removido)
+
+# 8. Ver orçamento do Flamengo
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/market/budget
-# Esperado: {"budget":15000000,"team_id":"00000000-0000-0000-0000-000000000001"}
+# Esperado: {"budget":80000000,"team_id":"00000000-0000-0000-0000-000000000010"}
 
-# 2. Listar agentes livres disponíveis
+# 9. Listar agentes livres e comprar um
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/market/available \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Total: {d[\"total\"]}'); [print(p['name'], p['position'], p['overall'], p['value']) for p in d['players'][:5]]"
-# Esperado: 27+ agentes livres, ordenados por overall DESC
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Livres: {d[\"total\"]}')"
 
-# 3. Filtrar por posição
-curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/market/available?position=FWD"
-# Esperado: apenas atacantes (8 no seed)
-
-# 4. Comprar um jogador — usar ID do 'Kwame Asante' (GK, £1.8M)
+# 10. Comprar Kwame Asante (GK, ~£1.8M)
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
   http://localhost:8080/api/v1/market/buy/20000000-0000-0000-0000-000000000003
-# Esperado: {"budget":13200000}   (15M - 1.8M)
+# Esperado: {"budget":78200000}   (80M - 1.8M)
 
-# 5. Confirmar que ele saiu dos disponíveis
-curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/market/available?position=GK" \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); names=[p['name'] for p in d['players']]; print('Kwame' in str(names))"
-# Esperado: False
-
-# 6. Vender um jogador do seu elenco — use o ID do jogador mais fraco do Brassfoot FC
-#    (ex: Sven Larsson, FWD, OVR 79, £3.5M)
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/v1/market/sell/00000000-0000-0000-0000-000000000112
-# Esperado: {"budget":16700000}   (13.2M + 3.5M)
-
-# 7. Tentar vender um jogador de outro time (deve retornar 403)
-curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/v1/market/sell/00000000-0000-0000-0000-000000001001
-# Esperado: 403
+# 11. Tentar selecionar time inválido (deve retornar 404)
+curl -s -o /dev/null -w "%{http_code}" -X POST \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"team_id":"00000000-0000-0000-0000-000000000001"}' \
+  http://localhost:8080/api/v1/manager/team
+# Esperado: 404 (Brassfoot FC não existe mais)
 ```
+
+> **Nota (v1):** trocar de time mid-career não é bloqueado no backend ainda — é possível trocar
+> livremente. Bloqueio será adicionado quando o fluxo de carreira for finalizado.
 
 > Transfer market testado em sessão via curl — compra, venda e validações funcionando corretamente.
 

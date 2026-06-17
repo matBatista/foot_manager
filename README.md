@@ -1,6 +1,6 @@
-# Brassfoot
+# ManagerFC
 
-A mobile football manager game set in the Brazilian football scene. You become a manager, simulate a full season of the **Campeonato Brasileiro Série A** with real clubs, track standings, play round by round, and save/load your progress.
+A mobile football manager game set in the Brazilian football scene. You become a manager, pick your club, simulate a full season of the **Campeonato Brasileiro Série A or Série B** with real clubs, track standings, play round by round, and save/load your progress.
 
 Built as a portfolio project — Go REST API + React Native (Expo) mobile app.
 
@@ -23,7 +23,8 @@ Built as a portfolio project — Go REST API + React Native (Expo) mobile app.
 
 ## Features
 
-- **Brasileirão Série A simulation** — 20 clubs (19 real + Brassfoot FC), 38 rounds, round-robin format matching the real competition
+- **Team selection** — choose any of 40 real Brazilian clubs (20 Série A + 20 Série B) to manage
+- **Brasileirão simulation** — 20 clubs per division, 38 rounds, round-robin format matching the real competition
 - **Match engine** — probabilistic simulation with home/away advantage and player attributes
 - **Live standings table** — updated after every round, with points, wins, draws, losses, and goal difference
 - **Save & load** — JWT-authenticated save-game system; multiple slots per manager
@@ -62,14 +63,22 @@ foot_manager/
 | `GET` | `/health` | — | Liveness check |
 | `POST` | `/api/v1/auth/register` | — | Register manager |
 | `POST` | `/api/v1/auth/login` | — | Login, get JWT |
-| `GET` | `/api/v1/squad` | optional | View squad |
+| `GET` | `/api/v1/manager/me` | JWT | My profile |
+| `POST` | `/api/v1/manager/team` | JWT | Select / change club |
+| `GET` | `/api/v1/squad` | optional + `?team_id` | View squad |
 | `GET` | `/api/v1/teams` | — | List all clubs |
+| `GET` | `/api/v1/teams/for-selection` | — | Clubs with avg OVR for picker |
 | `POST` | `/api/v1/leagues` | — | Create season |
 | `POST` | `/api/v1/leagues/:id/advance` | — | Advance rounds |
 | `GET` | `/api/v1/leagues/:id/table` | — | Current standings |
 | `POST` | `/api/v1/leagues/:id/save` | JWT | Save game state |
 | `GET` | `/api/v1/saves` | JWT | List saves |
 | `POST` | `/api/v1/saves/:id/restore` | — | Restore save |
+| `GET` | `/api/v1/market/budget` | JWT | Team budget |
+| `POST` | `/api/v1/market/buy/:id` | JWT | Buy free agent |
+| `POST` | `/api/v1/market/sell/:id` | JWT | Sell squad player |
+| `POST` | `/api/v1/career` | JWT | Start career |
+| `POST` | `/api/v1/career/next-season` | JWT | Advance season |
 
 ---
 

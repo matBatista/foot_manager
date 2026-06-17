@@ -1,8 +1,9 @@
 import { api } from './api';
 import { Player } from '../types/player';
 
-export async function fetchSquad(): Promise<Player[]> {
-  const response = await api.get<{ players: Player[]; total: number }>('/api/v1/squad');
+export async function fetchSquad(teamId?: string): Promise<Player[]> {
+  const params = teamId ? { team_id: teamId } : undefined;
+  const response = await api.get<{ players: Player[]; total: number }>('/api/v1/squad', { params });
   return response.data.players;
 }
 
