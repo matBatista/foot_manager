@@ -312,15 +312,61 @@ O fluxo manual de save-game (POST /:id/save → GET /saves → POST /saves/:save
 
 ---
 
+### 11. Múltiplas Temporadas / Promoção-Rebaixamento
+
+```bash
+# Registrar e logar (obtendo TOKEN)
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Manager","email":"manager@test.com","password":"senha123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+# Iniciar carreira (cria Série A Temporada 1, 20 times, 38 rodadas)
+START=$(curl -s -X POST http://localhost:8080/api/v1/career \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json')
+echo "$START" | python3 -c "import sys,json; d=json.load(sys.stdin); print('season:', d['career']['season_number'], '| div:', d['career']['division'], '| teams:', d['league']['teams'])"
+# Esperado: season: 1 | div: serie_a | teams: 20
+
+LEAGUE_ID=$(echo "$START" | python3 -c "import sys,json; print(json.load(sys.stdin)['league']['id'])")
+
+# Simular temporada inteira
+curl -s -X POST "http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance" \
+  -H 'Content-Type: application/json' -d '{"to_end":true}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('done:', d['league']['done'], '| top 3:', [r['name'] for r in d['table'][:3]])"
+# Esperado: done: True | top 3: [campeão, 2o, 3o]
+
+# Avançar para Temporada 2 (auto-simula Série B, aplica promoção/rebaixamento)
+NS=$(curl -s -X POST http://localhost:8080/api/v1/career/next-season \
+  -H "Authorization: Bearer $TOKEN")
+echo "$NS" | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print('Season:', d['career']['season_number'], '| Div:', d['career']['division'])
+print('Relegated:', len(d['relegated']), 'times')
+print('Promoted:', len(d['promoted']), 'times')
+"
+# Esperado: Season: 2 | Div: serie_a | Relegated: 4 times | Promoted: 4 times
+
+# Conferir histórico
+curl -s http://localhost:8080/api/v1/career/history \
+  -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "import sys,json; [print(f'T{r[\"season_number\"]} [{r[\"division\"]}]: {len(r[\"relegated_ids\"])}R/{len(r[\"promoted_ids\"])}P') for r in json.load(sys.stdin)]"
+# Esperado: T1 [serie_a]: 4R/4P
+```
+
+> **CONFIRMED** — testado em sessão: Temporada 1 completa, 4 times rebaixados (Novorizontino, Sport Recife, Red Bull Bragantino, Vitória), 4 promovidos da Série B (Ceará, CRB, Operário, Guarani), Temporada 2 com 20 times corretos.
+
+---
+
 ## Resumo de status
 
 | Verificação | Diretório | Status |
 |---|---|---|
 | `go build ./...` | `api/` | **CONFIRMED OK** |
 | `go vet ./...` | `api/` | **CONFIRMED OK** |
-| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler, league, match |
-| `go run ./cmd/server` + migrations (0001–0007) | `api/` | **CONFIRMED OK** |
+| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler, league, match, promotion |
+| `go run ./cmd/server` + migrations (0001–0011) | `api/` | **CONFIRMED OK** |
 | liga persiste após restart (`active_leagues`) | `api/` | **CONFIRMED OK** |
+| múltiplas temporadas + promoção/rebaixamento | `api/` | **CONFIRMED OK** via curl |
 | `npx tsc --noEmit` | `mobile/` | **CONFIRMED OK** — zero erros |
 | `npm run web` + fluxo save/load | `mobile/` | **CONFIRMED OK** via Expo web |
 | `npm run ios` | `mobile/` | **PENDING** — requer Xcode/simulador |

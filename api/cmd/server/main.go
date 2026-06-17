@@ -44,6 +44,7 @@ func main() {
 	saveGameRepo := repository.NewSaveGameRepository(pool)
 	activeLeagueRepo := repository.NewActiveLeagueRepository(pool)
 	transferRepo := repository.NewTransferRepository(pool)
+	careerRepo := repository.NewCareerRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
 	managerHandler := handler.NewManagerHandler(managerRepo)
@@ -51,6 +52,7 @@ func main() {
 	matchHandler := handler.NewMatchHandler(playerRepo)
 	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)
 	marketHandler := handler.NewMarketHandler(transferRepo)
+	careerHandler := handler.NewCareerHandler(careerRepo, managerRepo, teamRepo, playerRepo, leagueHandler)
 
 	app := fiber.New(fiber.Config{AppName: "Brassfoot API"})
 
@@ -97,6 +99,13 @@ func main() {
 	market.Get("/available", marketHandler.Available)
 	market.Post("/buy/:player_id", marketHandler.Buy)
 	market.Post("/sell/:player_id", marketHandler.Sell)
+
+	// Career / multi-season progression (all routes require authentication)
+	career := v1.Group("/career", middleware.RequireAuth(jwtSecret))
+	career.Post("/", careerHandler.StartCareer)
+	career.Get("/", careerHandler.GetCareer)
+	career.Post("/next-season", careerHandler.NextSeason)
+	career.Get("/history", careerHandler.GetHistory)
 
 	port := os.Getenv("PORT")
 	if port == "" {

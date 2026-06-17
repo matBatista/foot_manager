@@ -22,6 +22,17 @@ import {
   listSaves,
   restoreSave,
 } from '../services/leagueService';
+import {
+  Career,
+  SeasonRecord,
+  CareerState,
+  NextSeasonResponse,
+  getCareer,
+  startCareer,
+  nextSeason,
+  getCareerHistory,
+  divisionLabel,
+} from '../services/careerService';
 import { login, register } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 
@@ -87,7 +98,6 @@ function AuthModal({ visible, onClose, onSuccess }: AuthModalProps) {
       <View style={styles.modalCard}>
         <Text style={styles.modalTitle}>Conta</Text>
 
-        {/* Tabs */}
         <View style={styles.tabRow}>
           <TouchableOpacity
             style={[styles.tab, tab === 'login' && styles.tabActive]}
@@ -273,6 +283,67 @@ function AccountBanner({ onLogin }: AccountBannerProps) {
   );
 }
 
+// ---- Season History ----
+
+function SeasonHistory({ records }: { records: SeasonRecord[] }) {
+  if (records.length === 0) return null;
+
+  return (
+    <>
+      <Text style={styles.sectionLabel}>Histórico de Temporadas</Text>
+      <View style={styles.card}>
+        {records.map((r) => (
+          <View key={r.id} style={styles.historyRow}>
+            <View style={styles.historyLeft}>
+              <Text style={styles.historyTitle}>Temp. {r.season_number} — {divisionLabel(r.division)}</Text>
+              {r.champion_name ? (
+                <Text style={styles.historyChampion}>🏆 {r.champion_name}</Text>
+              ) : null}
+              {r.manager_position > 0 && (
+                <Text style={styles.historyPos}>Seu clube: {r.manager_position}º lugar</Text>
+              )}
+            </View>
+            <View style={styles.historyRight}>
+              {r.relegated_ids.length > 0 && (
+                <Text style={styles.historyRelLabel}>↓ {r.relegated_ids.length} rebaixados</Text>
+              )}
+              {r.promoted_ids.length > 0 && (
+                <Text style={styles.historyProLabel}>↑ {r.promoted_ids.length} promovidos</Text>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+// ---- Promotion/Relegation Card ----
+
+interface PromRelCardProps {
+  result: NextSeasonResponse;
+}
+
+function PromRelCard({ result }: PromRelCardProps) {
+  return (
+    <View style={styles.promRelCard}>
+      <Text style={styles.promRelTitle}>Fim de Temporada</Text>
+      {result.champion_name ? (
+        <Text style={styles.promRelChampion}>🏆 Campeão: {result.champion_name}</Text>
+      ) : null}
+      {result.relegated.length > 0 && (
+        <Text style={styles.promRelRelText}>↓ {result.relegated.length} clubes rebaixados</Text>
+      )}
+      {result.promoted.length > 0 && (
+        <Text style={styles.promRelProText}>↑ {result.promoted.length} clubes promovidos</Text>
+      )}
+      <Text style={styles.promRelNew}>
+        Nova temporada: {divisionLabel(result.career.division)}
+      </Text>
+    </View>
+  );
+}
+
 // ---- Main Screen ----
 
 export default function LeagueScreen() {
@@ -287,7 +358,83 @@ export default function LeagueScreen() {
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
 
+  // Career state
+  const [career, setCareer] = useState<Career | null>(null);
+  const [careerLoading, setCareerLoading] = useState(false);
+  const [history, setHistory] = useState<SeasonRecord[]>([]);
+  const [lastNextSeason, setLastNextSeason] = useState<NextSeasonResponse | null>(null);
+
   const token = useAuthStore((s) => s.token);
+
+  // When token changes, check for existing career.
+  useEffect(() => {
+    if (!token) {
+      setCareer(null);
+      setHistory([]);
+      return;
+    }
+    loadCareer();
+  }, [token]);
+
+  const loadCareer = useCallback(async () => {
+    setCareerLoading(true);
+    try {
+      const state: CareerState = await getCareer();
+      setCareer(state.career);
+      if (state.league) {
+        setLeague(state.league);
+        const tableRes = await getLeagueTable(state.league.id);
+        setTable(tableRes.table);
+      }
+      const hist = await getCareerHistory();
+      setHistory(hist);
+    } catch (e: any) {
+      if (e?.response?.status === 404) {
+        setCareer(null); // no career yet
+      }
+    } finally {
+      setCareerLoading(false);
+    }
+  }, []);
+
+  async function onStartCareer() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await startCareer();
+      setCareer(res.career);
+      setLeague(res.league);
+      setTable([]);
+      setLastResults([]);
+      setLastNextSeason(null);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? 'Não foi possível iniciar a carreira.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onNextSeason() {
+    setLoading(true);
+    setError(null);
+    setSaveMsg(null);
+    try {
+      const res = await nextSeason();
+      setCareer(res.career);
+      setLeague(res.league);
+      setTable([]);
+      setLastResults([]);
+      setLastNextSeason(res);
+      const hist = await getCareerHistory();
+      setHistory(hist);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? 'Falha ao avançar temporada.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function onCreateLeague() {
     setLoading(true);
@@ -310,6 +457,7 @@ export default function LeagueScreen() {
     setLoading(true);
     setError(null);
     setSaveMsg(null);
+    setLastNextSeason(null);
     try {
       const res = toEnd
         ? await simToEnd(league.id)
@@ -361,15 +509,55 @@ export default function LeagueScreen() {
     setSaveMsg(null);
   }
 
+  // ---- No league state ----
   if (!league) {
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.header}>Nova Temporada</Text>
+          <Text style={styles.header}>Liga</Text>
 
           <AccountBanner onLogin={() => setAuthModalVisible(true)} />
 
-          <Text style={styles.sectionLabel}>Escolha a liga</Text>
+          {careerLoading && <ActivityIndicator color="#e2b96f" style={{ marginBottom: 16 }} />}
+
+          {/* Career mode block */}
+          {token && !careerLoading && (
+            career ? (
+              <View style={styles.careerBanner}>
+                <Text style={styles.careerBannerTitle}>
+                  Carreira · Temp. {career.season_number} · {divisionLabel(career.division)}
+                </Text>
+                <Text style={styles.careerBannerSub}>Liga ainda não carregada</Text>
+                <TouchableOpacity
+                  style={[styles.btn, loading && styles.btnDisabled, { marginTop: 8 }]}
+                  onPress={loadCareer}
+                  disabled={loading}
+                >
+                  <Text style={styles.btnText}>Carregar Temporada</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.careerBanner}>
+                <Text style={styles.careerBannerTitle}>Modo Carreira</Text>
+                <Text style={styles.careerBannerSub}>
+                  Jogue múltiplas temporadas com promoção e rebaixamento entre Série A e Série B.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.btn, loading && styles.btnDisabled, { marginTop: 8 }]}
+                  onPress={onStartCareer}
+                  disabled={loading}
+                >
+                  {loading
+                    ? <ActivityIndicator color="#1a1a2e" />
+                    : <Text style={styles.btnText}>Iniciar Carreira</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            )
+          )}
+
+          {/* Partida rápida */}
+          <Text style={styles.sectionLabel}>Partida Rápida</Text>
           <View style={styles.chipRow}>
             {COUNTRIES.map((c) => (
               <TouchableOpacity
@@ -387,20 +575,20 @@ export default function LeagueScreen() {
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
+            style={[styles.btn, styles.btnOutline, loading && styles.btnDisabled]}
             onPress={onCreateLeague}
             disabled={loading}
           >
             {loading
-              ? <ActivityIndicator color="#1a1a2e" />
-              : <Text style={styles.btnText}>Iniciar Temporada</Text>
+              ? <ActivityIndicator color="#e2b96f" />
+              : <Text style={[styles.btnText, styles.btnOutlineText]}>Jogar Partida Rápida</Text>
             }
           </TouchableOpacity>
 
           <Text style={[styles.sectionLabel, { marginTop: 28 }]}>Carregar Save</Text>
-          <SavesList
-            onRestore={onRestoreSuccess}
-          />
+          <SavesList onRestore={onRestoreSuccess} />
+
+          <SeasonHistory records={history} />
         </ScrollView>
 
         <AuthModal
@@ -412,6 +600,12 @@ export default function LeagueScreen() {
     );
   }
 
+  // ---- Has league state ----
+
+  const isCareerLeague = !!career;
+  const divName = career ? divisionLabel(career.division) : (league.country ?? 'Liga');
+  const seasonNum = career ? `Temp. ${career.season_number}` : '';
+
   const roundLabel = league.done
     ? 'Temporada concluída'
     : `Rodada ${league.next_round - 1 > 0 ? league.next_round - 1 : '—'} / ${league.total_rounds}`;
@@ -422,10 +616,10 @@ export default function LeagueScreen() {
         {/* Header */}
         <View style={styles.seasonHeader}>
           <View>
-            <Text style={styles.header}>
-              {league.country ? league.country : 'Liga'}
+            <Text style={styles.header}>{divName}</Text>
+            <Text style={styles.subheader}>
+              {seasonNum ? `${seasonNum} · ` : ''}{roundLabel}
             </Text>
-            <Text style={styles.subheader}>{roundLabel}</Text>
           </View>
           <View style={styles.headerBtns}>
             {!token && (
@@ -436,26 +630,31 @@ export default function LeagueScreen() {
                 <Text style={[styles.resetBtnText, { color: '#e2b96f' }]}>Login</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={[styles.saveHeaderBtn, saveLoading && styles.btnDisabled]}
-              onPress={onSave}
-              disabled={saveLoading}
-            >
-              {saveLoading
-                ? <ActivityIndicator color="#e2b96f" size="small" />
-                : <Text style={styles.saveHeaderBtnText}>Salvar</Text>
-              }
-            </TouchableOpacity>
+            {!isCareerLeague && (
+              <TouchableOpacity
+                style={[styles.saveHeaderBtn, saveLoading && styles.btnDisabled]}
+                onPress={onSave}
+                disabled={saveLoading}
+              >
+                {saveLoading
+                  ? <ActivityIndicator color="#e2b96f" size="small" />
+                  : <Text style={styles.saveHeaderBtnText}>Salvar</Text>
+                }
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.resetBtn}
-              onPress={() => { setLeague(null); setSaveMsg(null); setError(null); }}
+              onPress={() => { setLeague(null); setSaveMsg(null); setError(null); setLastNextSeason(null); }}
             >
-              <Text style={styles.resetBtnText}>Nova</Text>
+              <Text style={styles.resetBtnText}>{isCareerLeague ? 'Menu' : 'Nova'}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {saveMsg && <Text style={styles.successText}>{saveMsg}</Text>}
+
+        {/* Post-next-season summary card */}
+        {lastNextSeason && <PromRelCard result={lastNextSeason} />}
 
         {/* Advance controls */}
         {!league.done && (
@@ -486,6 +685,18 @@ export default function LeagueScreen() {
             <Text style={styles.doneSubtext}>
               {table[0]?.name} vence o título
             </Text>
+            {isCareerLeague && (
+              <TouchableOpacity
+                style={[styles.nextSeasonBtn, loading && styles.btnDisabled]}
+                onPress={onNextSeason}
+                disabled={loading}
+              >
+                {loading
+                  ? <ActivityIndicator color="#1a1a2e" />
+                  : <Text style={styles.nextSeasonBtnText}>Próxima Temporada →</Text>
+                }
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -510,12 +721,15 @@ export default function LeagueScreen() {
         <View style={styles.card}>
           <StandingsHeader />
           {table.map((row) => (
-            <StandingRow key={row.team_id} row={row} />
+            <StandingRow key={row.team_id} row={row} isDone={league.done} />
           ))}
           {table.length === 0 && (
             <Text style={styles.muted}>Sem resultados ainda.</Text>
           )}
         </View>
+
+        {/* Season history inline */}
+        <SeasonHistory records={history} />
       </ScrollView>
 
       <AuthModal
@@ -542,10 +756,15 @@ function StandingsHeader() {
   );
 }
 
-function StandingRow({ row }: { row: TableRow }) {
-  const isTop = row.position <= 4;
+function StandingRow({ row, isDone }: { row: TableRow; isDone: boolean }) {
+  const isTop4 = row.position <= 4;
+  const isBottom4 = isDone && row.position >= (20 - 4 + 1); // 17-20
   return (
-    <View style={[styles.tableRow, isTop && styles.tableRowTop]}>
+    <View style={[
+      styles.tableRow,
+      isTop4 && styles.tableRowTop,
+      isBottom4 && styles.tableRowBottom,
+    ]}>
       <Text style={[styles.colPos, styles.cellText]}>{row.position}</Text>
       <Text style={[styles.colName, styles.cellText]} numberOfLines={1}>{row.name}</Text>
       <Text style={[styles.colStat, styles.cellText]}>{row.played}</Text>
@@ -663,6 +882,56 @@ const styles = StyleSheet.create({
   doneText: { color: '#e2b96f', fontSize: 18, fontWeight: 'bold' },
   doneSubtext: { color: '#f1f5f9', fontSize: 14, marginTop: 4 },
 
+  nextSeasonBtn: {
+    marginTop: 14,
+    backgroundColor: '#e2b96f',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+  },
+  nextSeasonBtnText: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
+
+  // Career banner
+  careerBanner: {
+    backgroundColor: '#0f3460',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  careerBannerTitle: { color: '#e2b96f', fontSize: 16, fontWeight: 'bold' },
+  careerBannerSub: { color: '#94a3b8', fontSize: 13, marginTop: 4, lineHeight: 18 },
+
+  // Promotion/Relegation card
+  promRelCard: {
+    backgroundColor: '#0f3460',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  promRelTitle: { color: '#e2b96f', fontSize: 15, fontWeight: 'bold', marginBottom: 4 },
+  promRelChampion: { color: '#f1f5f9', fontSize: 14, marginBottom: 2 },
+  promRelRelText: { color: '#ef4444', fontSize: 13, marginBottom: 2 },
+  promRelProText: { color: '#4ade80', fontSize: 13, marginBottom: 2 },
+  promRelNew: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
+
+  // Season history
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a2e',
+  },
+  historyLeft: { flex: 1 },
+  historyRight: { alignItems: 'flex-end' },
+  historyTitle: { color: '#f1f5f9', fontSize: 14, fontWeight: '600' },
+  historyChampion: { color: '#e2b96f', fontSize: 13, marginTop: 2 },
+  historyPos: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  historyRelLabel: { color: '#ef4444', fontSize: 12 },
+  historyProLabel: { color: '#4ade80', fontSize: 12 },
+
   errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 8, fontSize: 14 },
   successText: { color: '#4ade80', textAlign: 'center', marginVertical: 8, fontSize: 14 },
   muted: { color: '#64748b', fontSize: 14, paddingVertical: 8 },
@@ -684,6 +953,7 @@ const styles = StyleSheet.create({
   },
   tableHeaderRow: { backgroundColor: '#0f3460' },
   tableRowTop: { borderLeftWidth: 3, borderLeftColor: '#e2b96f' },
+  tableRowBottom: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
 
   colPos: { width: 22, textAlign: 'center' },
   colName: { flex: 1, paddingHorizontal: 6 },

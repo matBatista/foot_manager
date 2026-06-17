@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS season_records;
+DROP TABLE IF EXISTS careers;
+ALTER TABLE teams DROP COLUMN IF EXISTS division;

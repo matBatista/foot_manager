@@ -6,4 +6,5 @@ type Team struct {
 	ShortName string `json:"short_name"`
 	Country   string `json:"country"`
 	Budget    int64  `json:"budget"`
+	Division  string `json:"division"`
 }

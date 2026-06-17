@@ -68,9 +68,10 @@ func NewLeagueHandler(
 // ---- requests / responses ----
 
 type createLeagueRequest struct {
-	Country string   `json:"country"`  // optional: restrict to one country
-	TeamIDs []string `json:"team_ids"` // optional: explicit teams (overrides country)
-	Seed    int64    `json:"seed"`     // optional: 0 = random
+	Country  string   `json:"country"`  // optional: restrict to one country
+	Division string   `json:"division"` // optional: 'serie_a' or 'serie_b' (country=BR only)
+	TeamIDs  []string `json:"team_ids"` // optional: explicit teams (overrides country)
+	Seed     int64    `json:"seed"`     // optional: 0 = random
 }
 
 type leagueSummary struct {
@@ -313,7 +314,9 @@ func (h *LeagueHandler) persist(ctx context.Context, id string, st *leagueState)
 }
 
 // resolveTeams turns the request into the set of teams to play: explicit IDs if
-// given, else all teams in a country, else every team.
+// given, else all teams in a country (optionally filtered by division), else
+// every team. When country=BR and division is empty, defaults to 'serie_a' to
+// maintain backward compatibility (20 teams, not 40).
 func (h *LeagueHandler) resolveTeams(ctx context.Context, req createLeagueRequest) ([]model.Team, error) {
 	switch {
 	case len(req.TeamIDs) > 0:
@@ -327,6 +330,17 @@ func (h *LeagueHandler) resolveTeams(ctx context.Context, req createLeagueReques
 		}
 		return teams, nil
 	case req.Country != "":
+		div := req.Division
+		if div == "" && req.Country == "BR" {
+			div = "serie_a" // default for BR to avoid mixing 40 teams
+		}
+		if div != "" {
+			teams, err := h.teams.ListByCountryAndDivision(ctx, req.Country, div)
+			if err != nil {
+				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to load teams")
+			}
+			return teams, nil
+		}
 		teams, err := h.teams.ListByCountry(ctx, req.Country)
 		if err != nil {
 			return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to load teams")
