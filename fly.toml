@@ -1,28 +1,31 @@
-# Fly.io configuration for Brassfoot API
-# Run `fly deploy` from the repo root.
+# fly.toml app configuration file generated for foot-manager on 2026-06-17T21:06:25Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app            = "brassfoot-api"
-primary_region = "gru"        # São Paulo — closest to Brazil
+app = 'foot-manager'
+primary_region = 'gru'
 
 [build]
-  dockerfile = "Dockerfile"   # root-level, context = repo root
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "8080"
+  PORT = '8080'
 
 [http_service]
-  internal_port        = 8080
-  force_https          = true
-  auto_stop_machines   = true
-  auto_start_machines  = true
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
   min_machines_running = 0
 
   [http_service.concurrency]
-    type       = "connections"
+    type = 'connections'
     hard_limit = 100
     soft_limit = 80
 
 [[vm]]
-  cpu_kind = "shared"
-  cpus     = 1
-  memory   = "256mb"
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
