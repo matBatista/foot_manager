@@ -43,12 +43,14 @@ func main() {
 	teamRepo := repository.NewTeamRepository(pool)
 	saveGameRepo := repository.NewSaveGameRepository(pool)
 	activeLeagueRepo := repository.NewActiveLeagueRepository(pool)
+	transferRepo := repository.NewTransferRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
 	managerHandler := handler.NewManagerHandler(managerRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
 	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)
+	marketHandler := handler.NewMarketHandler(transferRepo)
 
 	app := fiber.New(fiber.Config{AppName: "Brassfoot API"})
 
@@ -88,6 +90,13 @@ func main() {
 	// Save-game list & restore
 	v1.Get("/saves", middleware.RequireAuth(jwtSecret), leagueHandler.ListSaves)
 	v1.Post("/saves/:save_id/restore", leagueHandler.Restore)
+
+	// Transfer market (all routes require authentication)
+	market := v1.Group("/market", middleware.RequireAuth(jwtSecret))
+	market.Get("/budget", marketHandler.Budget)
+	market.Get("/available", marketHandler.Available)
+	market.Post("/buy/:player_id", marketHandler.Buy)
+	market.Post("/sell/:player_id", marketHandler.Sell)
 
 	port := os.Getenv("PORT")
 	if port == "" {

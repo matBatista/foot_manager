@@ -17,7 +17,7 @@ func NewPlayerRepository(pool *pgxpool.Pool) *PlayerRepository {
 	return &PlayerRepository{pool: pool}
 }
 
-const playerColumns = `id, team_id, name, position, nationality, age,
+const playerColumns = `id, COALESCE(team_id::text, ''), name, position, nationality, age,
 	pace, shooting, passing, dribbling, defending, physical, overall, value`
 
 func scanPlayer(row pgx.CollectableRow) (model.Player, error) {

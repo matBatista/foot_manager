@@ -5,6 +5,7 @@ const MENU_ITEMS = [
   { label: '🏆  Liga', sub: 'Criar ou carregar uma temporada', route: '/league' },
   { label: '👥  Elenco', sub: 'Ver jogadores do seu time', route: '/squad' },
   { label: '⚽  Partida', sub: 'Resultados e simulação', route: '/match' },
+  { label: '💸  Mercado', sub: 'Comprar e vender jogadores', route: '/market' },
 ] as const;
 
 export default function HomeScreen() {

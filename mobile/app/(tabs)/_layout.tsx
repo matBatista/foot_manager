@@ -15,6 +15,7 @@ export default function TabLayout() {
       <Tabs.Screen name="squad" options={{ title: 'Squad', tabBarLabel: 'Squad' }} />
       <Tabs.Screen name="match" options={{ title: 'Match Day', tabBarLabel: 'Match' }} />
       <Tabs.Screen name="league" options={{ title: 'League', tabBarLabel: 'League' }} />
+      <Tabs.Screen name="market" options={{ title: 'Transfer Market', tabBarLabel: 'Market' }} />
     </Tabs>
   );
 }

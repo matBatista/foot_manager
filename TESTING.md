@@ -173,7 +173,51 @@ curl -s -X POST http://localhost:8080/api/v1/leagues/$LEAGUE_ID/advance \
 
 ---
 
-### 9. Smoke test dos endpoints via curl
+### 9. Transfer Market — smoke test via curl
+
+```bash
+# Com a API no ar e usuário registrado/logado (TOKEN da seção anterior):
+
+# 1. Ver orçamento atual
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/market/budget
+# Esperado: {"budget":15000000,"team_id":"00000000-0000-0000-0000-000000000001"}
+
+# 2. Listar agentes livres disponíveis
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/market/available \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Total: {d[\"total\"]}'); [print(p['name'], p['position'], p['overall'], p['value']) for p in d['players'][:5]]"
+# Esperado: 27+ agentes livres, ordenados por overall DESC
+
+# 3. Filtrar por posição
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/market/available?position=FWD"
+# Esperado: apenas atacantes (8 no seed)
+
+# 4. Comprar um jogador — usar ID do 'Kwame Asante' (GK, £1.8M)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/market/buy/20000000-0000-0000-0000-000000000003
+# Esperado: {"budget":13200000}   (15M - 1.8M)
+
+# 5. Confirmar que ele saiu dos disponíveis
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/market/available?position=GK" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); names=[p['name'] for p in d['players']]; print('Kwame' in str(names))"
+# Esperado: False
+
+# 6. Vender um jogador do seu elenco — use o ID do jogador mais fraco do Brassfoot FC
+#    (ex: Sven Larsson, FWD, OVR 79, £3.5M)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/market/sell/00000000-0000-0000-0000-000000000112
+# Esperado: {"budget":16700000}   (13.2M + 3.5M)
+
+# 7. Tentar vender um jogador de outro time (deve retornar 403)
+curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/market/sell/00000000-0000-0000-0000-000000001001
+# Esperado: 403
+```
+
+> Transfer market testado em sessão via curl — compra, venda e validações funcionando corretamente.
+
+---
+
+### 10. Smoke test dos endpoints via curl
 
 ```bash
 # Com a API no ar (http://localhost:8080)
