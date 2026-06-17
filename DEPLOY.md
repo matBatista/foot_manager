@@ -27,6 +27,8 @@
 
 ## API Deploy — Fly.io
 
+**App name: `managerfc-api`** (defined in `fly.toml`; use this in all `--app` flags below)
+
 ### Prerequisites (your machine — requires your account)
 
 ```bash
@@ -41,29 +43,23 @@ fly auth login
 ### Step 1 — Create the Fly app
 
 ```bash
-# From repo root
-fly launch --no-deploy \
-  --name brassfoot-api \
-  --region gru \
-  --dockerfile Dockerfile
-
-# fly launch will detect fly.toml and ask if you want to use it.
-# Answer: yes — or pass --config fly.toml
+# From repo root (fly.toml is already committed — no need for fly launch)
+fly apps create managerfc-api --org personal
 ```
 
-> **Your action:** accept the generated fly.toml or confirm the existing one.
+> **Note:** if you already ran `fly launch` or the app exists, skip this step. The `fly.toml` at the repo root already defines the config.
 
 ### Step 2 — Provision Postgres
 
 ```bash
 fly postgres create \
-  --name brassfoot-db \
+  --name managerfc-db \
   --region gru \
   --vm-size shared-cpu-1x \
   --volume-size 1          # 1 GB — enough for a portfolio DB
 
 # Attach the DB to the app (sets DATABASE_URL secret automatically)
-fly postgres attach brassfoot-db --app brassfoot-api
+fly postgres attach managerfc-db --app managerfc-api
 ```
 
 > **Your action:** confirm the provisioning prompts. Fly sets `DATABASE_URL` as a secret automatically after `attach`.
@@ -71,17 +67,15 @@ fly postgres attach brassfoot-db --app brassfoot-api
 ### Step 3 — Set remaining secrets
 
 ```bash
-# Generate a strong secret:  openssl rand -hex 32
-fly secrets set JWT_SECRET="<replace-with-strong-secret>" --app brassfoot-api
+# Generate a strong secret and set it in one command:
+fly secrets set JWT_SECRET="$(openssl rand -hex 32)" --app managerfc-api
 ```
-
-> **Your action:** replace `<replace-with-strong-secret>` with a value from `openssl rand -hex 32`.
 
 ### Step 4 — Deploy
 
 ```bash
 # From repo root
-fly deploy --app brassfoot-api
+fly deploy
 ```
 
 Fly builds the image, pushes it, and runs the container. Migrations run automatically on startup (same as local).
@@ -89,24 +83,78 @@ Fly builds the image, pushes it, and runs the container. Migrations run automati
 ### Step 5 — Verify
 
 ```bash
-fly status --app brassfoot-api
+fly status --app managerfc-api
 # Should show: running
 
-fly logs --app brassfoot-api
-# Should show: "Listening on :8080", migration lines
+fly logs --app managerfc-api
+# Should show lines like:
+#   DATABASE_URL and JWT_SECRET found
+#   migrations: no change (or applied N migrations)
+#   Listening on :8080
 
 # Hit the live health endpoint
-curl https://brassfoot-api.fly.dev/health
+curl https://managerfc-api.fly.dev/health
 # Expected: {"status":"ok"}
 ```
 
 ### Useful commands
 
 ```bash
-fly open --app brassfoot-api          # open in browser
-fly ssh console --app brassfoot-api   # shell into the VM
-fly postgres connect --app brassfoot-db  # psql session
-fly secrets list --app brassfoot-api  # confirm secrets are set
+fly open --app managerfc-api          # open in browser
+fly ssh console --app managerfc-api   # shell into the VM
+fly postgres connect --app managerfc-db  # psql session
+fly secrets list --app managerfc-api  # confirm secrets are set
+```
+
+---
+
+## Troubleshooting: 502 "App is not listening on expected port"
+
+This error always means the Go process **exited before calling `app.Listen()`**. The app crashes at startup for one of these reasons (check `fly logs --app managerfc-api`):
+
+### Most common: missing secrets
+
+```
+fatal: DATABASE_URL is not set
+```
+or
+```
+fatal: JWT_SECRET is not set
+```
+
+**Fix:** run steps 2 and 3 above, then `fly deploy` again.
+
+Confirm secrets are present:
+```bash
+fly secrets list --app managerfc-api
+# Must show: DATABASE_URL, JWT_SECRET
+```
+
+### DB unreachable at startup
+
+```
+migrations failed: ...
+database connection failed: ...
+```
+
+**Fix:** confirm the Postgres cluster is running and attached:
+```bash
+fly status --app managerfc-db       # Postgres cluster health
+fly postgres attach managerfc-db --app managerfc-api  # re-attach if needed
+```
+
+### Diagnostic workflow (run in order)
+
+```bash
+# 1. What error is logged?
+fly logs --app managerfc-api
+
+# 2. What secrets exist?
+fly secrets list --app managerfc-api
+
+# 3. Is the machine even starting?
+fly status --app managerfc-api
+fly machines list --app managerfc-api
 ```
 
 ---
@@ -127,7 +175,7 @@ fly secrets list --app brassfoot-api  # confirm secrets are set
 
 The mobile app currently points to `http://localhost:8080`. Before publishing:
 
-1. **Set the API base URL** to your production URL (`https://brassfoot-api.fly.dev`) — update the constant in `mobile/` where `localhost:8080` is referenced.
+1. **Set the API base URL** to your production URL (`https://managerfc-api.fly.dev`) — update the constant in `mobile/` where `localhost:8080` is referenced.
 
 2. **Install EAS CLI:**
    ```bash
@@ -162,14 +210,12 @@ For development preview without store submission, use **Expo Go** (scan QR from 
 
 ```bash
 # Build locally from repo root (no account needed):
-docker build -t brassfoot-api .
+docker build -t managerfc-api .
 
 # Run locally against local Postgres:
 docker run --rm \
   -e DATABASE_URL="postgres://brassfoot:brassfoot@host.docker.internal:5432/brassfoot?sslmode=disable" \
   -e JWT_SECRET="dev-secret" \
   -p 8080:8080 \
-  brassfoot-api
+  managerfc-api
 ```
-
-> **Status:** CONFIRMED — `docker build -t brassfoot-api .` executed successfully in this session. `golang:1.25-alpine` is available on Docker Hub. Final image is ~18 MB (Alpine + binary).
