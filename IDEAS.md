@@ -1,110 +1,74 @@
 # IDEAS — Brassfoot
 
-Registro de ideias para discussão futura. **Nada aqui está decidido** — são direções levantadas para alinhar em sessões posteriores com mais calma. Adicionar aqui é suficiente; não cria nenhuma tarefa de implementação.
+Caderno de anotações. **Nada aqui está decidido** — são direções e observações soltas
+para discutir com calma depois. Quando uma ideia vira trabalho de fato, ela sobe para o
+**[ROADMAP.md](ROADMAP.md)** e aqui fica só a anotação com o link apontando para lá.
 
 ---
 
 ## 1. Nome do projeto / marca
 
-O nome atual **Brassfoot / Brasfoot** foi questionado — pode não ser o ideal para um lançamento ou para o portfólio.
+`Brassfoot / Brasfoot` foi questionado — pode não ser ideal para lançamento ou portfólio
+(*Bras Foot* já é marca registrada de uma série de jogos). Candidatos: Manager Esportivo,
+Manager Sport Club, Sports Manager e **ManagerFC** (favorito atual).
 
-**Candidatos levantados:**
-- Manager Esportivo
-- Manager Sport Club
-- Sports Manager
+Em aberto: comunica bem o escopo? PT, EN ou bilíngue? Público é BR ou recrutador
+internacional? Verificar disponibilidade nas stores, domínio e redes.
 
-**Perguntas em aberto:**
-- Qual nome comunica melhor o escopo (manager game + Brasil)?
-- O nome precisa ser em português, inglês ou bilíngue?
-- Qual o público-alvo principal: usuários brasileiros ou recrutadores internacionais?
-- Verificar disponibilidade: nome do app nas stores (App Store / Play Store), domínio, redes sociais, possíveis conflitos de marca com jogos já existentes (ex: Bras Foot já é marca registrada de série histórica de jogos).
+→ Roadmap: [Open decisions — nome do projeto](ROADMAP.md#open-decisions)
 
 ---
 
-## 2. Estatísticas e análise durante/após a partida
+## 2. Transferências — o que ficou "para depois"
 
-Hoje a partida mostra apenas placar/resultado. A ideia é exibir dados analíticos que tornem a experiência mais rica:
+Anotação a partir do commit `a6dc47a` (*Transfer Market — milestone 1: free-agent pool*).
+A milestone 1 entregou só a compra/venda de agentes livres. O que ficou para depois:
 
-**Possíveis métricas a exibir:**
-- Posse de bola (%)
-- Chutes a gol / chutes totais
-- xG — gols esperados (expected goals)
-- Passes completados / tentativas
-- Faltas, escanteios, cartões
-- Melhores jogadores da partida (rating por desempenho)
+- Clubes da IA fazendo transferências entre si
+- Negociação de salários / contratos
+- Janela de transferências com datas de abertura/fechamento
+- Histórico de transações do manager
 
-**Perguntas em aberto:**
-- Quais métricas o motor de simulação já produz internamente? (Ver `api/internal/match/`)
-- Exibir só no resumo pós-jogo ou também como feed ao vivo durante a simulação?
-- Que nível de detalhe faz sentido para um MVP dessas estatísticas?
-
-**Conexão com roadmap existente:** o item *"Deep statistics — top scorers, assists, cards"* no README já aponta nessa direção; esse tema expande o escopo para a partida individual.
+→ Roadmap: [Planned — Transfer market](ROADMAP.md#planned) (já listado como sub-itens)
 
 ---
 
-## 3. Camada analítica integrada à experiência de manager
+## 3. Estatísticas e análise durante/após a partida
 
-Ideia mais ampla: o jogador deve se sentir imerso no papel de **manager/técnico**, não só de espectador. Isso passa por uma camada analítica/estatística que dê ao jogador informação para tomar decisões.
+Hoje a partida mostra só placar. Ideia: posse de bola, chutes/chutes a gol, **xG**, passes,
+faltas, escanteios, cartões, melhor jogador da partida. Em aberto: feed ao vivo vs. só
+resumo pós-jogo; o que o motor em `api/internal/match/` já produz.
 
-**Exemplos de funcionalidades que se encaixam aqui:**
-- Painel de desempenho do elenco ao longo da temporada
-- Comparação de jogadores para decisões táticas (quem escalar)
-- Relatórios de scout sobre adversários
-- Histórico de desempenho por partida (jogador X nas últimas 5 rodadas)
-- Gráfico de evolução na tabela ao longo do campeonato
-
-**Perguntas em aberto:**
-- Onde essa camada analítica vive na UI? (Aba dedicada? Integrada ao Squad? Tela de match detail?)
-- Qual o mínimo viável para transmitir imersão sem sobrecarregar a UI?
-
-**Conexão com roadmap existente:** se encaixa com *"Player development"* e *"Deep statistics"* — os dados coletados para estatísticas podem alimentar a evolução de atributos.
+→ Roadmap: [Planned — Deep statistics](ROADMAP.md#planned)
 
 ---
 
-## 4. Design com identidade esportiva
+## 4. Camada analítica integrada à experiência de manager
 
-O visual atual é funcional mas genérico. A direção levantada é um design com **cara de futebol**, inspirado em apps como Flashscore e Sofascore.
+O jogador deve se sentir **manager/técnico**, não espectador: painel de desempenho do elenco,
+comparação de jogadores para escalação, scout de adversários, forma nas últimas N rodadas,
+gráfico de evolução na tabela. Em aberto: onde vive na UI e qual o mínimo viável.
 
-**Elementos sugeridos:**
-- Ícones de cartão amarelo e vermelho
-- Ícone de apito para partidas / rodadas
-- Iconografia de campo, bola, substituição
-- Tipografia e layout que lembrem painéis de transmissão ou apps de resultados
-- Possível uso de fontes condensadas / bold style esportivo
-
-**Perguntas em aberto:**
-- Qual o grau de customização visual que o Expo/React Native permite de forma prática (sem sacrificar cross-platform)?
-- Criar uma design system própria ou buscar uma biblioteca de componentes esportivos existente?
-- Como garantir acessibilidade (contraste, tamanho de toque) com um visual mais denso?
+→ Roadmap: relacionado a [Player development + Deep statistics](ROADMAP.md#planned)
 
 ---
 
-## 5. Identidade visual — paleta de cores
+## 5. Design com identidade esportiva
 
-**Direção levantada:** verde como cor primária do app.
+Visual com cara de futebol, inspirado em Flashscore/Sofascore: ícones de cartão amarelo/
+vermelho, apito, campo, bola, substituição; tipografia condensada estilo transmissão.
 
-**Perguntas em aberto:**
-- Qual tom de verde? (Verde campo, verde escuro tipo uniforme, verde limão estilo neon?)
-- Cor secundária/de apoio? (Branco, cinza escuro, preto, dourado?)
-- A paleta precisa funcionar em modo escuro e claro?
-- Como o verde interage com os ícones de cartão (amarelo/vermelho do item 4) sem colidir?
-
-**Conexão com item 4:** paleta e ícones precisam ser definidos juntos como parte de uma única decisão de design.
+→ Roadmap: [Planned — Sporty visual identity](ROADMAP.md#planned)
 
 ---
 
-## Como essas ideias se encaixam no roadmap atual
+## 6. Identidade visual — paleta de cores
 
-| Ideia aqui | Item no roadmap (README) | Relação |
-|---|---|---|
-| Estatísticas de partida (item 2) | Deep statistics — top scorers, assists, cards | Expande para o nível de partida individual |
-| Camada analítica (item 3) | Player development + Deep statistics | Dados de performance alimentam evolução de atributos |
-| Design esportivo (item 4) | — | Novo; não consta no roadmap |
-| Identidade visual / verde (item 5) | — | Novo; não consta no roadmap |
-| Renome do projeto (item 1) | — | Decisão de marca; afeta README, stores e deploy |
+Direção: verde como cor primária. Em aberto: qual tom (campo / escuro / neon), cor
+secundária, modo claro+escuro, e como o verde convive com os ícones de cartão amarelo/vermelho.
 
-Os itens do roadmap ainda planejados (**transfer market**, **multiple seasons**, **push notifications**) continuam válidos e independentes dessas ideias — nenhuma delas os bloqueia ou substitui.
+→ Roadmap: parte de [Sporty visual identity](ROADMAP.md#planned)
 
 ---
 
-*Última atualização: junho 2026*
+*Última atualização: 2026-06-17*

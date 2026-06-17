@@ -106,22 +106,8 @@ cd mobile && npm install && npm run web
 
 ## Status & Roadmap
 
-### Done
-
-- [x] Manager auth (register / login / JWT)
-- [x] Brasileirão Série A — 20 clubs, 38 rounds
-- [x] Match simulation engine with player attributes
-- [x] Live standings table
-- [x] Save / load game (multiple slots)
-- [x] Mobile app — League, Match, Squad tabs
-
-### Planned
-
-- [ ] Transfer market — buy/sell players between clubs
-- [ ] Player development — attributes evolve across seasons
-- [ ] Multiple seasons — promotion/relegation system
-- [ ] Push notifications for match results
-- [ ] Deep statistics — top scorers, assists, cards
+See **[ROADMAP.md](ROADMAP.md)** for the full done/planned checklist, and
+**[IDEAS.md](IDEAS.md)** for early notes still under discussion.
 
 ---
 
