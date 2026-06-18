@@ -10,6 +10,8 @@ Vision checklist of what's done and what's next. Sub-bullets only when an item n
 - [x] Live standings table
 - [x] Save / load game (multiple slots)
 - [x] Mobile app — League, Match, Squad tabs
+- [x] Deep statistics — xG, possession, passes, pass accuracy, corners, fouls, shots per match; derived from the sim engine, no extra RNG; stored in JSONB snapshot
+- [x] Analytics layer — MatchDetails modal (stat bars A vs B, tap any league result), season-aggregate analytics panel in League screen (`GET /leagues/:id/analytics`)
 
 ## Planned
 

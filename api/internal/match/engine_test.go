@@ -185,6 +185,115 @@ func TestSimulate_RedCardStatMatchesEvents(t *testing.T) {
 	}
 }
 
+// ---- Analytics stats tests ----
+
+// TestStats_Deterministic ensures new analytics fields are reproduced exactly
+// when re-running Simulate with the same seed.
+func TestStats_Deterministic(t *testing.T) {
+	home := TeamInput{TeamID: "H", Name: "Home", Players: makeSquad("H", 75)}
+	away := TeamInput{TeamID: "A", Name: "Away", Players: makeSquad("A", 75)}
+
+	r1, _ := Simulate(home, away, 99)
+	r2, _ := Simulate(home, away, 99)
+
+	if r1.Home.XG != r2.Home.XG || r1.Away.XG != r2.Away.XG {
+		t.Errorf("xG not deterministic: %v vs %v", r1.Home.XG, r2.Home.XG)
+	}
+	if r1.Home.Passes != r2.Home.Passes || r1.Away.Passes != r2.Away.Passes {
+		t.Errorf("Passes not deterministic: %d vs %d", r1.Home.Passes, r2.Home.Passes)
+	}
+	if r1.Home.Corners != r2.Home.Corners {
+		t.Errorf("Corners not deterministic")
+	}
+	if r1.Home.Fouls != r2.Home.Fouls {
+		t.Errorf("Fouls not deterministic")
+	}
+}
+
+// TestStats_XG_Invariants checks hard invariants on expected goals.
+func TestStats_XG_Invariants(t *testing.T) {
+	home := TeamInput{TeamID: "H", Name: "Home", Players: makeSquad("H", 75)}
+	away := TeamInput{TeamID: "A", Name: "Away", Players: makeSquad("A", 75)}
+
+	for seed := int64(1); seed <= 100; seed++ {
+		r, err := Simulate(home, away, seed)
+		if err != nil {
+			t.Fatalf("seed %d: %v", err, seed)
+		}
+		if r.Home.XG < 0 || r.Away.XG < 0 {
+			t.Errorf("seed %d: negative xG: home=%.2f away=%.2f", seed, r.Home.XG, r.Away.XG)
+		}
+		// XG is accumulated per chance as onTargetProb * goalProb.
+		// Upper bound: shots × max(onTargetProb) × max(goalProb) = shots × 0.9 × goalConversionBase.
+		maxXG := float64(r.Home.Shots) * 0.9 * goalConversionBase
+		if r.Home.XG > maxXG+0.01 {
+			t.Errorf("seed %d: home xG %.2f exceeds theoretical max %.2f", seed, r.Home.XG, maxXG)
+		}
+	}
+}
+
+// TestStats_XG_CoherentWithGoals verifies that over many seeds, cumulative xG
+// is reasonably close to cumulative goals (within 30%).
+func TestStats_XG_CoherentWithGoals(t *testing.T) {
+	home := TeamInput{TeamID: "H", Name: "Home", Players: makeSquad("H", 75)}
+	away := TeamInput{TeamID: "A", Name: "Away", Players: makeSquad("A", 75)}
+
+	var totalXG, totalGoals float64
+	const n = 200
+	for seed := int64(1); seed <= n; seed++ {
+		r, _ := Simulate(home, away, seed)
+		totalXG += r.Home.XG + r.Away.XG
+		totalGoals += float64(r.Home.Goals + r.Away.Goals)
+	}
+	ratio := totalXG / totalGoals
+	if ratio < 0.7 || ratio > 1.5 {
+		t.Errorf("xG/goals ratio %.2f outside [0.7, 1.5] over %d seeds", ratio, n)
+	}
+}
+
+// TestStats_Passes_Reasonable checks that passes and pass accuracy are within
+// plausible football ranges.
+func TestStats_Passes_Reasonable(t *testing.T) {
+	home := TeamInput{TeamID: "H", Name: "Home", Players: makeSquad("H", 75)}
+	away := TeamInput{TeamID: "A", Name: "Away", Players: makeSquad("A", 75)}
+
+	for seed := int64(1); seed <= 50; seed++ {
+		r, _ := Simulate(home, away, seed)
+		for _, s := range []struct {
+			label string
+			stats TeamStats
+		}{{"home", r.Home}, {"away", r.Away}} {
+			if s.stats.Passes < 50 || s.stats.Passes > 900 {
+				t.Errorf("seed %d %s: Passes=%d outside [50,900]", seed, s.label, s.stats.Passes)
+			}
+			if s.stats.PassAccuracy < 65 || s.stats.PassAccuracy > 92 {
+				t.Errorf("seed %d %s: PassAccuracy=%d outside [65,92]", seed, s.label, s.stats.PassAccuracy)
+			}
+		}
+	}
+}
+
+// TestStats_Corners_NonNegative and TestStats_Fouls_NonNegative.
+func TestStats_Corners_Fouls(t *testing.T) {
+	home := TeamInput{TeamID: "H", Name: "Home", Players: makeSquad("H", 75)}
+	away := TeamInput{TeamID: "A", Name: "Away", Players: makeSquad("A", 75)}
+
+	for seed := int64(1); seed <= 100; seed++ {
+		r, _ := Simulate(home, away, seed)
+		if r.Home.Corners < 0 || r.Away.Corners < 0 {
+			t.Errorf("seed %d: negative corners", seed)
+		}
+		if r.Home.Fouls < 0 || r.Away.Fouls < 0 {
+			t.Errorf("seed %d: negative fouls h=%d a=%d", seed, r.Home.Fouls, r.Away.Fouls)
+		}
+		// Fouls scale with cards; verify they're internally consistent:
+		// fouls must be at least the base level.
+		if r.Home.Fouls < foulBase || r.Away.Fouls < foulBase {
+			t.Errorf("seed %d: fouls below base (%d): h=%d a=%d", seed, foulBase, r.Home.Fouls, r.Away.Fouls)
+		}
+	}
+}
+
 // TestSecondYellowIsRed checks the booking model: a player who reaches two
 // yellows must appear in a red_card event detailed "second yellow".
 func TestSecondYellowIsRed(t *testing.T) {

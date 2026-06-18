@@ -396,17 +396,67 @@ curl -s http://localhost:8080/api/v1/career/history \
 
 ---
 
+---
+
+### 12. Estatísticas analíticas de partida
+
+```bash
+# Criar liga brasileirão e avançar 1 rodada
+LID=$(curl -s -X POST http://localhost:8080/api/v1/leagues \
+  -H 'Content-Type: application/json' \
+  -d '{"country":"BR","division":"serie_a","seed":42}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+curl -s -X POST "http://localhost:8080/api/v1/leagues/$LID/advance" \
+  -H 'Content-Type: application/json' -d '{"rounds":1}' \
+  | python3 -c "
+import sys, json
+r = json.load(sys.stdin)['results'][0]
+hs, as_ = r['home_stats'], r['away_stats']
+print(r['home_name'], r['home_goals'], '-', r['away_goals'], r['away_name'])
+print('xG:', hs['xg'], 'vs', as_['xg'])           # must be 2dp floats
+print('Passes:', hs['passes'], '/', as_['passes'])  # must be > 0
+print('Posse:', hs['possession'] + as_['possession']) # must be 100
+"
+# Esperado: xG com 2 casas decimais, passes > 0, posse soma 100
+
+# Buscar todas as partidas com stats
+curl -s "http://localhost:8080/api/v1/leagues/$LID/results" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{len(d[\"results\"])} resultados, primeiro com home_stats:', bool(d[\"results\"][0].get(\"home_stats\")))"
+
+# Análise agregada por time (após N rodadas)
+curl -s -X POST "http://localhost:8080/api/v1/leagues/$LID/advance" \
+  -H 'Content-Type: application/json' -d '{"rounds":4}' > /dev/null
+
+curl -s "http://localhost:8080/api/v1/leagues/$LID/analytics" \
+  | python3 -c "
+import sys, json
+teams = json.load(sys.stdin)['teams']
+print('Time                    xGF   xGA   Pos%')
+for t in teams[:5]:
+    print(f'{t[\"name\"]:<22}  {t[\"xg_for\"]:5.2f}  {t[\"xg_against\"]:5.2f}  {t[\"avg_possession\"]:5.1f}')
+"
+# Esperado: times ordenados por xG a favor, com médias plausíveis (xGF > 0)
+```
+
+> **CONFIRMED** — curl validado em sessão: stats presentes em advance/results/analytics, xG arredondado a 2 casas, posse soma 100, passes > 0.
+
+---
+
 ## Resumo de status
 
 | Verificação | Diretório | Status |
 |---|---|---|
 | `go build ./...` | `api/` | **CONFIRMED OK** |
 | `go vet ./...` | `api/` | **CONFIRMED OK** |
-| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler (5 novos testes SelectTeam), league, match, promotion |
-| `go run ./cmd/server` + migrations (0001–0011) | `api/` | **CONFIRMED OK** |
+| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler, league, match (5 novos testes de stats), promotion |
+| `go run ./cmd/server` + migrations (0001–0012) | `api/` | **CONFIRMED OK** |
 | liga persiste após restart (`active_leagues`) | `api/` | **CONFIRMED OK** |
 | múltiplas temporadas + promoção/rebaixamento | `api/` | **CONFIRMED OK** via curl |
 | bloqueio troca de time com carreira ativa (409) | `api/` | **CONFIRMED OK** via curl |
+| stats de partida (xG, passes, posse, escanteios, faltas) | `api/` | **CONFIRMED OK** via curl |
+| endpoint `GET /leagues/:id/results` | `api/` | **CONFIRMED OK** via curl |
+| endpoint `GET /leagues/:id/analytics` | `api/` | **CONFIRMED OK** via curl |
 | `npx tsc --noEmit` | `mobile/` | **CONFIRMED OK** — zero erros |
 | `npm run web` + fluxo save/load | `mobile/` | **CONFIRMED OK** via Expo web |
 | login/registro UI (Home + SelectTeam + League) | `mobile/` | **CONFIRMED OK** via Expo web |

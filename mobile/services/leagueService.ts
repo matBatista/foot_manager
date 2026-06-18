@@ -23,6 +23,20 @@ export interface TableRow {
   points: number;
 }
 
+export interface MatchStats {
+  goals: number;
+  shots: number;
+  shots_on_target: number;
+  possession: number;
+  xg: number;
+  passes: number;
+  pass_accuracy: number;
+  corners: number;
+  fouls: number;
+  yellow_cards: number;
+  red_cards: number;
+}
+
 export interface ResultRow {
   round: number;
   home_team_id: string;
@@ -31,6 +45,19 @@ export interface ResultRow {
   away_name: string;
   home_goals: number;
   away_goals: number;
+  home_stats?: MatchStats;
+  away_stats?: MatchStats;
+}
+
+export interface TeamAnalytics {
+  team_id: string;
+  name: string;
+  played: number;
+  total_xg_for: number;
+  total_xg_against: number;
+  avg_possession: number;
+  avg_shots: number;
+  total_goals: number;
 }
 
 export interface TableResponse {
@@ -96,5 +123,15 @@ export async function listSaves(): Promise<SaveMeta[]> {
 
 export async function restoreSave(saveId: string): Promise<RestoreResponse> {
   const res = await api.post<RestoreResponse>(`/api/v1/saves/${saveId}/restore`);
+  return res.data;
+}
+
+export async function getLeagueResults(id: string): Promise<{ results: ResultRow[] }> {
+  const res = await api.get<{ results: ResultRow[] }>(`/api/v1/leagues/${id}/results`);
+  return res.data;
+}
+
+export async function getLeagueAnalytics(id: string): Promise<{ teams: TeamAnalytics[] }> {
+  const res = await api.get<{ teams: TeamAnalytics[] }>(`/api/v1/leagues/${id}/analytics`);
   return res.data;
 }

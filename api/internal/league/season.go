@@ -82,9 +82,13 @@ func (s *Season) PlayRound() ([]Played, error) {
 		if err != nil {
 			return nil, err
 		}
+		homeStats := r.Home
+		awayStats := r.Away
 		played := Played{
-			Fixture: f,
-			Score:   Score{Home: r.Home.Goals, Away: r.Away.Goals},
+			Fixture:   f,
+			Score:     Score{Home: r.Home.Goals, Away: r.Away.Goals},
+			HomeStats: &homeStats,
+			AwayStats: &awayStats,
 		}
 		s.Results = append(s.Results, played)
 		out = append(out, played)
@@ -107,4 +111,95 @@ func (s *Season) PlaySeason() error {
 // Table returns the current standings from all results played so far.
 func (s *Season) Table() []TableRow {
 	return BuildTable(s.teamIDs, s.Results)
+}
+
+// TeamAggStats holds aggregated match statistics for one team over the season.
+type TeamAggStats struct {
+	TeamID        string  `json:"team_id"`
+	Name          string  `json:"name"`
+	Played        int     `json:"played"`
+	AvgPossession float64 `json:"avg_possession"`
+	XGFor         float64 `json:"xg_for"`
+	XGAgainst     float64 `json:"xg_against"`
+	AvgXGFor      float64 `json:"avg_xg_for"`
+	AvgXGAgainst  float64 `json:"avg_xg_against"`
+	AvgShots      float64 `json:"avg_shots"`
+	WinRate       float64 `json:"win_rate"`
+}
+
+// AggStats computes per-team aggregated match statistics from all results
+// played so far. names maps team ID to display name. Teams with no results
+// still appear (all zeros). Results without stats (legacy data) are skipped
+// for the analytics fields but still counted for win/draw/loss.
+func (s *Season) AggStats(names map[string]string) []TeamAggStats {
+	type acc struct {
+		played      int
+		won         int
+		possSum     float64
+		xgFor       float64
+		xgAgainst   float64
+		shotsSum    float64
+		statsPlayed int // matches that have analytics data
+	}
+	m := make(map[string]*acc, len(s.teamIDs))
+	for _, id := range s.teamIDs {
+		m[id] = &acc{}
+	}
+
+	for _, p := range s.Results {
+		ha, hok := m[p.Home]
+		aa, aok := m[p.Away]
+		if !hok || !aok {
+			continue
+		}
+
+		ha.played++
+		aa.played++
+		if p.Score.Home > p.Score.Away {
+			ha.won++
+		} else if p.Score.Away > p.Score.Home {
+			aa.won++
+		}
+
+		if p.HomeStats != nil && p.AwayStats != nil {
+			ha.statsPlayed++
+			aa.statsPlayed++
+			ha.possSum += float64(p.HomeStats.Possession)
+			aa.possSum += float64(p.AwayStats.Possession)
+			ha.xgFor += p.HomeStats.XG
+			aa.xgFor += p.AwayStats.XG
+			ha.xgAgainst += p.AwayStats.XG
+			aa.xgAgainst += p.HomeStats.XG
+			ha.shotsSum += float64(p.HomeStats.Shots)
+			aa.shotsSum += float64(p.AwayStats.Shots)
+		}
+	}
+
+	out := make([]TeamAggStats, 0, len(s.teamIDs))
+	for _, id := range s.teamIDs {
+		a := m[id]
+		row := TeamAggStats{
+			TeamID: id,
+			Name:   names[id],
+			Played: a.played,
+			XGFor:  round2(a.xgFor),
+			XGAgainst: round2(a.xgAgainst),
+		}
+		if a.statsPlayed > 0 {
+			n := float64(a.statsPlayed)
+			row.AvgPossession = round2(a.possSum / n)
+			row.AvgXGFor = round2(a.xgFor / n)
+			row.AvgXGAgainst = round2(a.xgAgainst / n)
+			row.AvgShots = round2(a.shotsSum / n)
+		}
+		if a.played > 0 {
+			row.WinRate = round2(float64(a.won) / float64(a.played) * 100)
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func round2(f float64) float64 {
+	return float64(int(f*100+0.5)) / 100
 }

@@ -89,6 +89,8 @@ func main() {
 	leagues.Get("/:id", leagueHandler.Get)
 	leagues.Get("/:id/table", leagueHandler.Table)
 	leagues.Post("/:id/advance", leagueHandler.Advance)
+	leagues.Get("/:id/results", leagueHandler.Results)
+	leagues.Get("/:id/analytics", leagueHandler.Analytics)
 	leagues.Post("/:id/save", middleware.RequireAuth(jwtSecret), leagueHandler.Save)
 
 	// Save-game list & restore

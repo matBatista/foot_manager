@@ -8,7 +8,7 @@ export interface Team {
   budget: number;
 }
 
-export type MatchEventType = 'goal' | 'shot' | 'yellow_card';
+export type MatchEventType = 'goal' | 'shot' | 'yellow_card' | 'red_card';
 
 export interface MatchEvent {
   minute: number;
@@ -25,7 +25,13 @@ export interface TeamStats {
   shots: number;
   shots_on_target: number;
   possession: number;
+  xg: number;
+  passes: number;
+  pass_accuracy: number;
+  corners: number;
+  fouls: number;
   yellow_cards: number;
+  red_cards: number;
 }
 
 export interface MatchResult {

@@ -32,10 +32,10 @@ const matchMinutes = 90
 // (roughly 1–3 goals and 8–14 shots per team). Adjust here to rebalance the
 // game without touching the simulation logic.
 const (
-	baseChancePerMinute = 0.34  // P(possessing team creates a chance) this minute
-	shotOnTargetBase    = 0.40  // baseline P(shot is on target)
-	goalConversionBase  = 0.34  // baseline P(on-target shot is a goal)
-	yellowCardPerMinute = 0.012 // P(a foul earns a yellow) per minute
+	baseChancePerMinute  = 0.34   // P(possessing team creates a chance) this minute
+	shotOnTargetBase     = 0.40   // baseline P(shot is on target)
+	goalConversionBase   = 0.34   // baseline P(on-target shot is a goal)
+	yellowCardPerMinute  = 0.012  // P(a foul earns a yellow) per minute
 	straightRedPerMinute = 0.0009 // P(a straight red) per minute, per team
 
 	// Fatigue: at full time a line with average Physical loses up to
@@ -47,6 +47,26 @@ const (
 	// outfield ratings, floored so a team is never reduced below minViability.
 	manDownPenalty = 0.07
 	minViability   = 0.40
+
+	// Derived stats coefficients (no extra RNG — computed from sim output).
+	//   cornersPerShot: fraction of shots that result in a corner kick.
+	//   foulsPerYellow: average fouls committed per yellow card.
+	//   foulBase: base fouls per team even without cards.
+	cornersPerShot = 0.35
+	foulsPerYellow = 7
+	foulsPerRed    = 4
+	foulBase       = 5
+
+	// Passes per possession minute, scaling with average team passing.
+	// passesBase + passScale*avgPassing → ~4.5 passes/min at passing=65.
+	passesBase  = 2.0
+	passesScale = 0.04
+
+	// Pass accuracy (0–100%) as a linear function of avg passing.
+	passAccBase  = 62.0
+	passAccScale = 0.26
+	passAccMax   = 88
+	passAccMin   = 60
 )
 
 // EventType enumerates the kinds of events the timeline can contain.
@@ -77,14 +97,20 @@ type TeamInput struct {
 
 // TeamStats summarises a team's performance after the match.
 type TeamStats struct {
-	TeamID        string `json:"team_id"`
-	Name          string `json:"name"`
-	Goals         int    `json:"goals"`
-	Shots         int    `json:"shots"`
-	ShotsOnTarget int    `json:"shots_on_target"`
-	Possession    int    `json:"possession"` // percentage, home + away = 100
-	YellowCards   int    `json:"yellow_cards"`
-	RedCards      int    `json:"red_cards"`
+	TeamID        string  `json:"team_id"`
+	Name          string  `json:"name"`
+	Goals         int     `json:"goals"`
+	Shots         int     `json:"shots"`
+	ShotsOnTarget int     `json:"shots_on_target"`
+	Possession    int     `json:"possession"` // percentage, home + away = 100
+	YellowCards   int     `json:"yellow_cards"`
+	RedCards      int     `json:"red_cards"`
+	// Derived analytics — coherent with the simulation that produced the score.
+	XG           float64 `json:"xg"`           // expected goals, accumulated per chance
+	Passes       int     `json:"passes"`        // derived from possession minutes × avg passing
+	PassAccuracy int     `json:"pass_accuracy"` // % (0–100), derived from lineup passing rating
+	Corners      int     `json:"corners"`       // derived from total shots
+	Fouls        int     `json:"fouls"`         // derived from yellow/red cards
 }
 
 // Result is the full outcome of a simulated match.
@@ -168,6 +194,30 @@ func Simulate(home, away TeamInput, seed int64) (Result, error) {
 		return result.Events[i].Minute < result.Events[j].Minute
 	})
 
+	// Derive analytics from the simulation output (no extra RNG — fully
+	// deterministic given the seed, and coherent with goals/shots/cards).
+	awayMinutes := matchMinutes - homeMinutes
+	hPass := lineupAvgPassing(&h)
+	aPass := lineupAvgPassing(&a)
+
+	result.Home.Passes = int(float64(homeMinutes) * (passesBase + hPass*passesScale))
+	result.Away.Passes = int(float64(awayMinutes) * (passesBase + aPass*passesScale))
+
+	result.Home.PassAccuracy = clampInt(int(passAccBase+hPass*passAccScale), passAccMin, passAccMax)
+	result.Away.PassAccuracy = clampInt(int(passAccBase+aPass*passAccScale), passAccMin, passAccMax)
+
+	// Corners: fraction of total shots that result in a corner.
+	result.Home.Corners = int(float64(result.Home.Shots) * cornersPerShot)
+	result.Away.Corners = int(float64(result.Away.Shots) * cornersPerShot)
+
+	// Fouls: base fouls + yellow/red card contributions.
+	result.Home.Fouls = foulBase + result.Home.YellowCards*foulsPerYellow + result.Home.RedCards*foulsPerRed
+	result.Away.Fouls = foulBase + result.Away.YellowCards*foulsPerYellow + result.Away.RedCards*foulsPerRed
+
+	// Round XG to 2 decimal places for clean JSON output across all endpoints.
+	result.Home.XG = float64(int(result.Home.XG*100+0.5)) / 100
+	result.Away.XG = float64(int(result.Away.XG*100+0.5)) / 100
+
 	return result, nil
 }
 
@@ -188,11 +238,19 @@ func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defS
 	attStats.Shots++
 	shooter := att.pickScorer(rng)
 
-	// On target?
+	// Compute probabilities before the RNG rolls so we can accumulate XG
+	// using the exact same math that decides the actual outcome.
 	onTargetProb := shotOnTargetBase * float64(shooter.Shooting) / 75.0
 	if onTargetProb > 0.9 {
 		onTargetProb = 0.9
 	}
+	goalProb := goalConversionBase * float64(shooter.Shooting) / (float64(shooter.Shooting) + def.goalkeeping)
+
+	// XG: the probability this chance becomes a goal, accumulated per chance.
+	// Perfectly coherent with the actual goal/shot outcome below.
+	attStats.XG += onTargetProb * goalProb
+
+	// On target?
 	if rng.Float64() >= onTargetProb {
 		// Off target.
 		*events = append(*events, Event{
@@ -204,7 +262,6 @@ func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defS
 	attStats.ShotsOnTarget++
 
 	// On target → goal or save. Striker's shooting vs keeper's defence + line.
-	goalProb := goalConversionBase * float64(shooter.Shooting) / (float64(shooter.Shooting) + def.goalkeeping)
 	if rng.Float64() < goalProb {
 		attStats.Goals++
 		*events = append(*events, Event{
@@ -430,6 +487,19 @@ func (l *lineup) pickOnField(rng *rand.Rand) (model.Player, bool) {
 	return pool[rng.Intn(len(pool))], true
 }
 
+// lineupAvgPassing returns the average Passing attribute of the players
+// currently on the pitch, used for post-simulation pass statistics.
+func lineupAvgPassing(l *lineup) float64 {
+	if len(l.players) == 0 {
+		return 50
+	}
+	sum := 0.0
+	for _, p := range l.players {
+		sum += float64(p.Passing)
+	}
+	return sum / float64(len(l.players))
+}
+
 // removePlayer returns ps without the player whose ID matches.
 func removePlayer(ps []model.Player, id string) []model.Player {
 	out := ps[:0:0]
@@ -450,4 +520,14 @@ func safeAvg(sum, n, fallback float64) float64 {
 		return fallback
 	}
 	return sum / n
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

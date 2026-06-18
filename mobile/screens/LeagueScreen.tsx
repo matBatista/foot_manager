@@ -12,6 +12,7 @@ import {
   LeagueSummary,
   TableRow,
   ResultRow,
+  TeamAnalytics,
   SaveMeta,
   createLeague,
   getLeagueTable,
@@ -20,7 +21,9 @@ import {
   saveLeague,
   listSaves,
   restoreSave,
+  getLeagueAnalytics,
 } from '../services/leagueService';
+import MatchDetailsModal from '../components/MatchDetailsModal';
 import {
   Career,
   SeasonRecord,
@@ -237,6 +240,13 @@ export default function LeagueScreen() {
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
 
+  // Match details modal
+  const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null);
+
+  // Analytics
+  const [analytics, setAnalytics] = useState<TeamAnalytics[] | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   // Career state
   const [career, setCareer] = useState<Career | null>(null);
   const [careerLoading, setCareerLoading] = useState(false);
@@ -350,6 +360,19 @@ export default function LeagueScreen() {
       setLoading(false);
     }
   }, [league]);
+
+  async function onLoadAnalytics() {
+    if (!league) return;
+    setAnalyticsLoading(true);
+    try {
+      const res = await getLeagueAnalytics(league.id);
+      setAnalytics(res.teams);
+    } catch {
+      // silently ignore; analytics are non-critical
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }
 
   async function onSave() {
     if (!league) return;
@@ -523,7 +546,7 @@ export default function LeagueScreen() {
             )}
             <TouchableOpacity
               style={styles.resetBtn}
-              onPress={() => { setLeague(null); setSaveMsg(null); setError(null); setLastNextSeason(null); }}
+              onPress={() => { setLeague(null); setSaveMsg(null); setError(null); setLastNextSeason(null); setAnalytics(null); }}
             >
               <Text style={styles.resetBtnText}>{isCareerLeague ? 'Menu' : 'Nova'}</Text>
             </TouchableOpacity>
@@ -589,7 +612,7 @@ export default function LeagueScreen() {
             </Text>
             <View style={styles.card}>
               {lastResults.map((r, i) => (
-                <MatchResultRow key={i} result={r} />
+                <MatchResultRow key={i} result={r} onPress={() => setSelectedResult(r)} />
               ))}
             </View>
           </>
@@ -607,6 +630,25 @@ export default function LeagueScreen() {
           )}
         </View>
 
+        {/* Analytics section */}
+        {league.next_round > 2 && (
+          <>
+            <Text style={styles.sectionLabel}>Análise da Temporada</Text>
+            {!analytics && (
+              <TouchableOpacity
+                style={[styles.btn, styles.btnOutline, analyticsLoading && styles.btnDisabled]}
+                onPress={onLoadAnalytics}
+                disabled={analyticsLoading}
+              >
+                <Text style={[styles.btnText, styles.btnOutlineText]}>
+                  {analyticsLoading ? 'Carregando…' : 'Ver Análise'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {analytics && <AnalyticsTable teams={analytics} />}
+          </>
+        )}
+
         {/* Season history inline */}
         <SeasonHistory records={history} />
       </ScrollView>
@@ -615,6 +657,12 @@ export default function LeagueScreen() {
         visible={authModalVisible}
         onClose={() => { setAuthModalVisible(false); setPendingSave(false); }}
         onSuccess={onAuthSuccess}
+      />
+
+      <MatchDetailsModal
+        visible={selectedResult !== null}
+        result={selectedResult}
+        onClose={() => setSelectedResult(null)}
       />
     </SafeAreaView>
   );
@@ -658,20 +706,49 @@ function StandingRow({ row, isDone }: { row: TableRow; isDone: boolean }) {
   );
 }
 
-function MatchResultRow({ result }: { result: ResultRow }) {
+function MatchResultRow({ result, onPress }: { result: ResultRow; onPress?: () => void }) {
   const homeWin = result.home_goals > result.away_goals;
   const awayWin = result.away_goals > result.home_goals;
+  const hasStats = !!(result.home_stats && result.away_stats);
   return (
-    <View style={styles.resultRow}>
+    <TouchableOpacity style={styles.resultRow} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
       <Text style={[styles.resultTeam, homeWin && styles.resultWinner]} numberOfLines={1}>
         {result.home_name}
       </Text>
-      <Text style={styles.resultScore}>
-        {result.home_goals} – {result.away_goals}
-      </Text>
+      <View style={styles.resultScoreWrap}>
+        <Text style={styles.resultScore}>
+          {result.home_goals} – {result.away_goals}
+        </Text>
+        {hasStats && <Text style={styles.resultStatsHint}>ver stats</Text>}
+      </View>
       <Text style={[styles.resultTeam, styles.resultTeamRight, awayWin && styles.resultWinner]} numberOfLines={1}>
         {result.away_name}
       </Text>
+    </TouchableOpacity>
+  );
+}
+
+function AnalyticsTable({ teams }: { teams: TeamAnalytics[] }) {
+  return (
+    <View style={styles.card}>
+      <View style={[styles.tableRow, styles.tableHeaderRow]}>
+        <Text style={[styles.colName, styles.colHeader]}>Time</Text>
+        <Text style={[styles.colStat, styles.colHeader]}>J</Text>
+        <Text style={[styles.colStat, styles.colHeader]}>xG</Text>
+        <Text style={[styles.colStat, styles.colHeader]}>xGC</Text>
+        <Text style={[styles.colStat, styles.colHeader]}>Pos%</Text>
+        <Text style={[styles.colStat, styles.colHeader]}>Chut</Text>
+      </View>
+      {teams.map((t) => (
+        <View key={t.team_id} style={styles.tableRow}>
+          <Text style={[styles.colName, styles.cellText]} numberOfLines={1}>{t.name}</Text>
+          <Text style={[styles.colStat, styles.cellText]}>{t.played}</Text>
+          <Text style={[styles.colStat, styles.cellText]}>{t.total_xg_for.toFixed(1)}</Text>
+          <Text style={[styles.colStat, styles.cellText]}>{t.total_xg_against.toFixed(1)}</Text>
+          <Text style={[styles.colStat, styles.cellText]}>{t.avg_possession.toFixed(0)}</Text>
+          <Text style={[styles.colStat, styles.cellText]}>{t.avg_shots.toFixed(1)}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -855,14 +932,14 @@ const styles = StyleSheet.create({
   resultTeam: { flex: 1, color: '#94a3b8', fontSize: 13 },
   resultTeamRight: { textAlign: 'right' },
   resultWinner: { color: '#f1f5f9', fontWeight: '700' },
+  resultScoreWrap: { alignItems: 'center', paddingHorizontal: 12, minWidth: 70 },
   resultScore: {
     color: '#e2b96f',
     fontSize: 15,
     fontWeight: 'bold',
-    paddingHorizontal: 12,
-    minWidth: 60,
     textAlign: 'center',
   },
+  resultStatsHint: { color: '#334155', fontSize: 10, marginTop: 2 },
 
   // Account banner
   loginBanner: {

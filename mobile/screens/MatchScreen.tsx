@@ -60,7 +60,6 @@ export default function MatchScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.header}>Match Day</Text>
 
-        {/* Team pickers */}
         <Text style={styles.label}>Home</Text>
         <TeamPicker teams={teams} selected={homeId} onSelect={setHomeId} />
 
@@ -91,11 +90,19 @@ export default function MatchScreen() {
               <Text style={styles.scoreTeam}>{teamName(awayId)}</Text>
             </View>
 
-            {/* Stat comparison */}
-            <StatRow label="Possession" home={`${result.home.possession}%`} away={`${result.away.possession}%`} />
-            <StatRow label="Shots" home={result.home.shots} away={result.away.shots} />
-            <StatRow label="On target" home={result.home.shots_on_target} away={result.away.shots_on_target} />
-            <StatRow label="Yellow cards" home={result.home.yellow_cards} away={result.away.yellow_cards} />
+            {/* Stats comparison */}
+            <Text style={styles.sectionLabel}>Estatísticas</Text>
+            <View style={styles.statsBlock}>
+              <StatBar label="Posse" homeVal={result.home.possession} awayVal={result.away.possession} format={(v) => `${v}%`} />
+              <StatBar label="xG" homeVal={result.home.xg} awayVal={result.away.xg} format={(v) => v.toFixed(2)} />
+              <StatBar label="Chutes" homeVal={result.home.shots} awayVal={result.away.shots} />
+              <StatBar label="No alvo" homeVal={result.home.shots_on_target} awayVal={result.away.shots_on_target} />
+              <StatBar label="Passes" homeVal={result.home.passes} awayVal={result.away.passes} />
+              <StatBar label="% Passes" homeVal={result.home.pass_accuracy} awayVal={result.away.pass_accuracy} format={(v) => `${v}%`} />
+              <StatBar label="Escanteios" homeVal={result.home.corners} awayVal={result.away.corners} />
+              <StatBar label="Faltas" homeVal={result.home.fouls} awayVal={result.away.fouls} />
+              <StatBar label="Amarelos" homeVal={result.home.yellow_cards} awayVal={result.away.yellow_cards} />
+            </View>
 
             {/* Timeline */}
             <Text style={styles.timelineHeader}>Timeline</Text>
@@ -138,23 +145,54 @@ function TeamPicker({
   );
 }
 
-function StatRow({ label, home, away }: { label: string; home: React.ReactNode; away: React.ReactNode }) {
+// StatBar renders a symmetric two-team comparison row with a visual proportional bar.
+export function StatBar({
+  label,
+  homeVal,
+  awayVal,
+  format,
+}: {
+  label: string;
+  homeVal: number;
+  awayVal: number;
+  format?: (v: number) => string;
+}) {
+  const total = homeVal + awayVal;
+  const homeFlex = total > 0 ? homeVal / total : 0.5;
+  const awayFlex = total > 0 ? awayVal / total : 0.5;
+  const fmt = format ?? ((v: number) => String(v));
+
   return (
-    <View style={styles.statRow}>
-      <Text style={styles.statValue}>{home}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{away}</Text>
+    <View style={styles.statBarRow}>
+      <Text style={styles.statBarValue}>{fmt(homeVal)}</Text>
+      <View style={styles.statBarCenter}>
+        <Text style={styles.statBarLabel}>{label}</Text>
+        <View style={styles.statBarTrack}>
+          <View style={[styles.statBarHome, { flex: homeFlex }]} />
+          <View style={[styles.statBarAway, { flex: awayFlex }]} />
+        </View>
+      </View>
+      <Text style={[styles.statBarValue, styles.statBarValueRight]}>{fmt(awayVal)}</Text>
     </View>
   );
 }
 
 function EventRow({ event, homeId }: { event: MatchEvent; homeId: string | null }) {
   const isHome = event.team_id === homeId;
-  const icon = event.type === 'goal' ? '⚽' : event.type === 'yellow_card' ? '🟨' : '•';
+  const icon =
+    event.type === 'goal'
+      ? '⚽'
+      : event.type === 'yellow_card'
+        ? '🟨'
+        : event.type === 'red_card'
+          ? '🟥'
+          : '•';
   return (
     <View style={[styles.eventRow, isHome ? styles.eventLeft : styles.eventRight]}>
       <Text style={styles.eventText}>
-        {isHome ? `${event.minute}' ${icon} ${event.player}` : `${event.player} ${icon} ${event.minute}'`}
+        {isHome
+          ? `${event.minute}' ${icon} ${event.player}`
+          : `${event.player} ${icon} ${event.minute}'`}
       </Text>
     </View>
   );
@@ -196,16 +234,50 @@ const styles = StyleSheet.create({
   },
   scoreTeam: { color: '#f1f5f9', fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
   score: { color: '#e2b96f', fontSize: 30, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-  statRow: {
+
+  sectionLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  statsBlock: {
+    backgroundColor: '#16213e',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+
+  statBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#16213e',
+    borderBottomColor: '#1a1a2e',
   },
-  statValue: { color: '#f1f5f9', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
-  statLabel: { color: '#64748b', fontSize: 13, flex: 2, textAlign: 'center' },
+  statBarValue: {
+    color: '#f1f5f9',
+    fontSize: 14,
+    fontWeight: '600',
+    width: 48,
+    textAlign: 'left',
+  },
+  statBarValueRight: { textAlign: 'right' },
+  statBarCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
+  statBarLabel: { color: '#64748b', fontSize: 11, marginBottom: 4 },
+  statBarTrack: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  statBarHome: { backgroundColor: '#e2b96f', borderRadius: 3 },
+  statBarAway: { backgroundColor: '#0f3460', borderRadius: 3 },
+
   timelineHeader: { color: '#f1f5f9', fontSize: 18, fontWeight: '700', marginTop: 24, marginBottom: 12 },
   muted: { color: '#64748b', fontSize: 14 },
   eventRow: { marginVertical: 4, maxWidth: '75%' },

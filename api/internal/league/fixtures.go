@@ -7,7 +7,11 @@
 // match engine for fast auto-simulation.
 package league
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/brassfoot/api/internal/match"
+)
 
 // Fixture is a single scheduled match in a given round.
 type Fixture struct {
@@ -22,10 +26,14 @@ type Score struct {
 	Away int `json:"away"`
 }
 
-// Played is a completed fixture together with its score.
+// Played is a completed fixture together with its score and match statistics.
+// HomeStats and AwayStats are nil for legacy data serialised before analytics
+// were introduced (safe to display with zero-value fallbacks).
 type Played struct {
 	Fixture
-	Score Score `json:"score"`
+	Score     Score             `json:"score"`
+	HomeStats *match.TeamStats  `json:"home_stats,omitempty"`
+	AwayStats *match.TeamStats  `json:"away_stats,omitempty"`
 }
 
 // GenerateFixtures returns a double round-robin schedule: every pair of teams

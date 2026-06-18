@@ -31,23 +31,30 @@ A milestone 1 entregou só a compra/venda de agentes livres. O que ficou para de
 
 ---
 
-## 3. Estatísticas e análise durante/após a partida
+## 3. Estatísticas e análise durante/após a partida ✅ IMPLEMENTADO
 
-Hoje a partida mostra só placar. Ideia: posse de bola, chutes/chutes a gol, **xG**, passes,
-faltas, escanteios, cartões, melhor jogador da partida. Em aberto: feed ao vivo vs. só
-resumo pós-jogo; o que o motor em `api/internal/match/` já produz.
+Partida agora mostra posse, chutes/no alvo, **xG** (derivado das mesmas probabilidades
+que geram gols — coerente), passes, precisão de passe, escanteios, faltas, cartões.
+Engine extendida sem alterar o processo de simulação (XG acumulado por chance; demais
+derivados determinísticos de shots/cards/possession).
 
-→ Roadmap: [Planned — Deep statistics](ROADMAP.md#planned)
+→ Implementado em: `api/internal/match/engine.go`, `api/internal/league/fixtures.go`,
+`api/internal/league/season.go`, `api/internal/handler/league.go`,
+`mobile/screens/MatchScreen.tsx`, `mobile/components/MatchDetailsModal.tsx`
 
 ---
 
-## 4. Camada analítica integrada à experiência de manager
+## 4. Camada analítica integrada à experiência de manager ✅ IMPLEMENTADO (base)
 
-O jogador deve se sentir **manager/técnico**, não espectador: painel de desempenho do elenco,
-comparação de jogadores para escalação, scout de adversários, forma nas últimas N rodadas,
-gráfico de evolução na tabela. Em aberto: onde vive na UI e qual o mínimo viável.
+Tela de detalhes da partida (modal com barras comparativas A vs B), acessível ao tocar
+num resultado na aba Liga. Análise agregada de temporada via `GET /api/v1/leagues/:id/analytics`
+(xG for/against, posse média, chutes médios por time) com botão "Ver Análise" na Liga.
 
-→ Roadmap: relacionado a [Player development + Deep statistics](ROADMAP.md#planned)
+→ Implementado em: `mobile/components/MatchDetailsModal.tsx`,
+`mobile/screens/LeagueScreen.tsx`, `api/internal/handler/league.go`
+
+Itens para evoluir: comparação de jogadores para escalação, scout de adversários,
+forma nas últimas N rodadas, gráfico de evolução na tabela.
 
 ---
 

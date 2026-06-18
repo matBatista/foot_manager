@@ -76,9 +76,9 @@ func TestGenerateFixtures_NoTeamTwicePerRound(t *testing.T) {
 func TestBuildTable_PointsAndOrder(t *testing.T) {
 	ids := []string{"A", "B", "C"}
 	results := []Played{
-		{Fixture{1, "A", "B"}, Score{2, 0}}, // A wins
-		{Fixture{1, "B", "C"}, Score{1, 1}}, // draw
-		{Fixture{2, "A", "C"}, Score{0, 0}}, // draw
+		{Fixture: Fixture{1, "A", "B"}, Score: Score{2, 0}}, // A wins
+		{Fixture: Fixture{1, "B", "C"}, Score: Score{1, 1}}, // draw
+		{Fixture: Fixture{2, "A", "C"}, Score: Score{0, 0}}, // draw
 	}
 	table := BuildTable(ids, results)
 

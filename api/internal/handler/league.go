@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"sort"
 	"sync"
 
 	"github.com/brassfoot/api/internal/league"
@@ -97,15 +98,33 @@ type tableRowResponse struct {
 	Points   int    `json:"points"`
 }
 
-type resultResponse struct {
-	Round     int    `json:"round"`
-	HomeID    string `json:"home_team_id"`
-	HomeName  string `json:"home_name"`
-	AwayID    string `json:"away_team_id"`
-	AwayName  string `json:"away_name"`
-	HomeGoals int    `json:"home_goals"`
-	AwayGoals int    `json:"away_goals"`
+// matchStatsResponse is the per-team statistics block included in result responses.
+type matchStatsResponse struct {
+	Goals         int     `json:"goals"`
+	Shots         int     `json:"shots"`
+	ShotsOnTarget int     `json:"shots_on_target"`
+	Possession    int     `json:"possession"`
+	XG            float64 `json:"xg"`
+	Passes        int     `json:"passes"`
+	PassAccuracy  int     `json:"pass_accuracy"`
+	Corners       int     `json:"corners"`
+	Fouls         int     `json:"fouls"`
+	YellowCards   int     `json:"yellow_cards"`
+	RedCards      int     `json:"red_cards"`
 }
+
+type resultResponse struct {
+	Round     int                 `json:"round"`
+	HomeID    string              `json:"home_team_id"`
+	HomeName  string              `json:"home_name"`
+	AwayID    string              `json:"away_team_id"`
+	AwayName  string              `json:"away_name"`
+	HomeGoals int                 `json:"home_goals"`
+	AwayGoals int                 `json:"away_goals"`
+	HomeStats *matchStatsResponse `json:"home_stats,omitempty"`
+	AwayStats *matchStatsResponse `json:"away_stats,omitempty"`
+}
+
 
 // ---- handlers ----
 
@@ -390,17 +409,83 @@ func (st *leagueState) tableRows() []tableRowResponse {
 func (st *leagueState) resultRows(played []league.Played) []resultResponse {
 	out := make([]resultResponse, len(played))
 	for i, p := range played {
-		out[i] = resultResponse{
-			Round:     p.Round,
-			HomeID:    p.Home,
-			HomeName:  st.names[p.Home],
-			AwayID:    p.Away,
-			AwayName:  st.names[p.Away],
-			HomeGoals: p.Score.Home,
-			AwayGoals: p.Score.Away,
-		}
+		out[i] = resultResponseFromPlayed(p, st.names)
 	}
 	return out
+}
+
+// resultResponseFromPlayed converts a Played record (with optional stats) into
+// the API response shape, resolving team names from the names map.
+func resultResponseFromPlayed(p league.Played, names map[string]string) resultResponse {
+	r := resultResponse{
+		Round:     p.Round,
+		HomeID:    p.Home,
+		HomeName:  names[p.Home],
+		AwayID:    p.Away,
+		AwayName:  names[p.Away],
+		HomeGoals: p.Score.Home,
+		AwayGoals: p.Score.Away,
+	}
+	if p.HomeStats != nil {
+		hs := statsResponse(p.HomeStats)
+		r.HomeStats = &hs
+	}
+	if p.AwayStats != nil {
+		as := statsResponse(p.AwayStats)
+		r.AwayStats = &as
+	}
+	return r
+}
+
+func statsResponse(s *match.TeamStats) matchStatsResponse {
+	return matchStatsResponse{
+		Goals:         s.Goals,
+		Shots:         s.Shots,
+		ShotsOnTarget: s.ShotsOnTarget,
+		Possession:    s.Possession,
+		XG:            s.XG,
+		Passes:        s.Passes,
+		PassAccuracy:  s.PassAccuracy,
+		Corners:       s.Corners,
+		Fouls:         s.Fouls,
+		YellowCards:   s.YellowCards,
+		RedCards:      s.RedCards,
+	}
+}
+
+// Results returns all played fixtures in the league, with match statistics.
+func (h *LeagueHandler) Results(c *fiber.Ctx) error {
+	id := c.Params("id")
+	st, ok := h.lookupOrLoad(c.Context(), id)
+	if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "league not found")
+	}
+	h.mu.Lock()
+	results := make([]league.Played, len(st.season.Results))
+	copy(results, st.season.Results)
+	names := st.names
+	h.mu.Unlock()
+
+	out := make([]resultResponse, len(results))
+	for i, p := range results {
+		out[i] = resultResponseFromPlayed(p, names)
+	}
+	return c.JSON(fiber.Map{"results": out})
+}
+
+// Analytics returns season-aggregate performance stats for every team.
+func (h *LeagueHandler) Analytics(c *fiber.Ctx) error {
+	id := c.Params("id")
+	st, ok := h.lookupOrLoad(c.Context(), id)
+	if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "league not found")
+	}
+	h.mu.Lock()
+	teams := st.season.AggStats(st.names)
+	h.mu.Unlock()
+
+	sort.Slice(teams, func(i, j int) bool { return teams[i].XGFor > teams[j].XGFor })
+	return c.JSON(fiber.Map{"teams": teams})
 }
 
 func mapSimError(err error) error {
