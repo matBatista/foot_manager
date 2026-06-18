@@ -47,7 +47,7 @@ func main() {
 	careerRepo := repository.NewCareerRepository(pool)
 	squadHandler := handler.NewSquadHandler(playerRepo, managerRepo)
 	authHandler := handler.NewAuthHandler(managerRepo, jwtSecret)
-	managerHandler := handler.NewManagerHandler(managerRepo, teamRepo)
+	managerHandler := handler.NewManagerHandler(managerRepo, teamRepo, careerRepo)
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
 	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)

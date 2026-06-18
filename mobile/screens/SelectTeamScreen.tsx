@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTeamStore } from '../store/teamStore';
 import { useAuthStore } from '../store/authStore';
+import AuthModal from '../components/AuthModal';
 import {
   TeamForSelection,
   fetchTeamsForSelection,
@@ -40,6 +40,8 @@ export default function SelectTeamScreen() {
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [pendingTeam, setPendingTeam] = useState<TeamForSelection | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,34 +60,71 @@ export default function SelectTeamScreen() {
     load();
   }, [load]);
 
-  const handleSelect = async (team: TeamForSelection) => {
+  // Calls backend to persist team, then saves locally and navigates home.
+  const doSelect = async (team: TeamForSelection) => {
     setSelecting(team.id);
+    setError(null);
     try {
-      if (token) {
-        await selectTeamOnServer(team.id);
-      }
+      await selectTeamOnServer(team.id);
       setTeam(teamForSelectionToStore(team));
       router.replace('/');
-    } catch {
-      setError('Erro ao selecionar o time. Tente novamente.');
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        setError(
+          'Não é possível trocar de time durante uma carreira ativa. Conclua ou abandone a carreira atual primeiro.',
+        );
+      } else {
+        setError('Erro ao selecionar o time. Tente novamente.');
+      }
     } finally {
       setSelecting(null);
     }
+  };
+
+  const handleSelect = (team: TeamForSelection) => {
+    if (!token) {
+      // Require auth so the selection is persisted to the server.
+      setPendingTeam(team);
+      setAuthModalVisible(true);
+      return;
+    }
+    doSelect(team);
+  };
+
+  // After login/register, retry the pending team selection.
+  const onAuthSuccess = () => {
+    setAuthModalVisible(false);
+    if (pendingTeam) {
+      const team = pendingTeam;
+      setPendingTeam(null);
+      doSelect(team);
+    }
+  };
+
+  const onAuthClose = () => {
+    setAuthModalVisible(false);
+    setPendingTeam(null);
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <Text style={styles.header}>Escolha seu time</Text>
-        <Text style={styles.sub}>Selecione o clube que você vai gerenciar</Text>
+        <Text style={styles.sub}>
+          {token
+            ? 'Selecione o clube que você vai gerenciar'
+            : 'Faça login para salvar sua escolha no servidor'}
+        </Text>
 
         {loading && <ActivityIndicator color="#e2b96f" style={{ marginTop: 40 }} />}
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={load}>
-              <Text style={styles.retryText}>Tentar novamente</Text>
-            </TouchableOpacity>
+            {!error.includes('carreira ativa') && (
+              <TouchableOpacity style={styles.retryBtn} onPress={load}>
+                <Text style={styles.retryText}>Tentar novamente</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -129,6 +168,12 @@ export default function SelectTeamScreen() {
           />
         )}
       </View>
+
+      <AuthModal
+        visible={authModalVisible}
+        onClose={onAuthClose}
+        onSuccess={onAuthSuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -220,12 +265,14 @@ const styles = StyleSheet.create({
   errorBox: {
     alignItems: 'center',
     marginTop: 40,
+    paddingHorizontal: 8,
   },
   errorText: {
     color: '#ef4444',
     textAlign: 'center',
     fontSize: 14,
     marginBottom: 16,
+    lineHeight: 20,
   },
   retryBtn: {
     backgroundColor: '#16213e',

@@ -235,10 +235,22 @@ curl -s -o /dev/null -w "%{http_code}" -X POST \
   -d '{"team_id":"00000000-0000-0000-0000-000000000001"}' \
   http://localhost:8080/api/v1/manager/team
 # Esperado: 404 (Brassfoot FC não existe mais)
+
+# 12. Iniciar carreira e verificar bloqueio de troca
+curl -s -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/career \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Carreira:', d['career']['season_number'], d['career']['division'])"
+# Esperado: Carreira: 1 serie_a
+
+# Tentar trocar de time agora — deve retornar 409
+curl -s -w "\nHTTP: %{http_code}" -X POST \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"team_id":"00000000-0000-0000-0000-000000000012"}' \
+  http://localhost:8080/api/v1/manager/team
+# Esperado: "cannot change team while a career is active..."
+# HTTP: 409
 ```
 
-> **Nota (v1):** trocar de time mid-career não é bloqueado no backend ainda — é possível trocar
-> livremente. Bloqueio será adicionado quando o fluxo de carreira for finalizado.
+> **Bloqueio de troca implementado (v2):** `POST /api/v1/manager/team` retorna 409 quando o manager já tem uma carreira ativa. A troca é permitida antes de `POST /career` e bloqueada depois. Regra: uma vez que a carreira existe na tabela `careers`, o `team_id` é travado. Testes unitários Go cobrem os casos (sem carreira → 200, com carreira → 409, sem DB escrito ao bloquear, time inválido → 404, team_id vazio → 400).
 
 > Transfer market testado em sessão via curl — compra, venda e validações funcionando corretamente.
 
@@ -390,11 +402,13 @@ curl -s http://localhost:8080/api/v1/career/history \
 |---|---|---|
 | `go build ./...` | `api/` | **CONFIRMED OK** |
 | `go vet ./...` | `api/` | **CONFIRMED OK** |
-| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler, league, match, promotion |
+| `go test ./...` | `api/` | **CONFIRMED OK** — auth, handler (5 novos testes SelectTeam), league, match, promotion |
 | `go run ./cmd/server` + migrations (0001–0011) | `api/` | **CONFIRMED OK** |
 | liga persiste após restart (`active_leagues`) | `api/` | **CONFIRMED OK** |
 | múltiplas temporadas + promoção/rebaixamento | `api/` | **CONFIRMED OK** via curl |
+| bloqueio troca de time com carreira ativa (409) | `api/` | **CONFIRMED OK** via curl |
 | `npx tsc --noEmit` | `mobile/` | **CONFIRMED OK** — zero erros |
 | `npm run web` + fluxo save/load | `mobile/` | **CONFIRMED OK** via Expo web |
+| login/registro UI (Home + SelectTeam + League) | `mobile/` | **CONFIRMED OK** via Expo web |
 | `npm run ios` | `mobile/` | **PENDING** — requer Xcode/simulador |
 | `npm run android` | `mobile/` | **PENDING** — requer Android Studio |
