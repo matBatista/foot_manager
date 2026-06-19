@@ -31,6 +31,23 @@ A milestone 1 entregou só a compra/venda de agentes livres. O que ficou para de
 
 ---
 
+## 3. Redesign de navegação e identidade visual — commit `592108f` (2026-06-19)
+
+**Entregue:** fluxo Home → Career Hub → Match + paleta verde.
+
+- Paleta verde: `#22c55e` primary, `#0d1a0f` bg, `#fbbf24` gold — centralizada em `constants/theme.ts`
+- Nova estrutura Expo Router: `app/(career)/` com tab navigator (Hub, Elenco, Liga, Mercado, Base)
+- Tela de Jogo: campo virtual 4-4-2, placar, stat bars verde/vermelho, modo career + standalone
+- `store/matchStore.ts` conecta Hub → Partida (passa resultados da rodada)
+- `screens/SelectTeamScreen.tsx` agora redireciona para `/(career)` após seleção
+
+**Próximos passos desta direção:**
+- Nomes reais dos jogadores nos pontos do campo (precisa combinar squad API com a tela de jogo)
+- Animação básica dos eventos (gol, cartão) no campo durante a partida
+- Tela de Academia com dados reais (base juvenil)
+
+---
+
 ## 3. Estatísticas e análise durante/após a partida ✅ IMPLEMENTADO
 
 Partida agora mostra posse, chutes/no alvo, **xG** (derivado das mesmas probabilidades
