@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, SafeAreaView,
+  ActivityIndicator, SafeAreaView, Alert, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { useTeamStore } from '../../store/teamStore';
+import { useCareerStore } from '../../store/careerStore';
 import { useMatchResultStore } from '../../store/matchStore';
 import {
-  getCareer, startCareer, divisionLabel,
+  getCareer, startCareer, deleteCareer, divisionLabel,
   type Career,
 } from '../../services/careerService';
 import {
@@ -25,6 +26,7 @@ export default function CareerHubScreen() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const selectedTeam = useTeamStore((s) => s.selectedTeam);
+  const { activeCareer, setActiveCareer, clear: clearCareer } = useCareerStore();
   const { roundResults, setRoundResults } = useMatchResultStore();
 
   const [career, setCareer] = useState<Career | null>(null);
@@ -34,6 +36,7 @@ export default function CareerHubScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
+  const [manageVisible, setManageVisible] = useState(false);
   const [selectedResult, setSelectedResult] = useState<ResultRow | null>(null);
 
   const loadCareer = useCallback(async () => {
@@ -41,8 +44,9 @@ export default function CareerHubScreen() {
     setLoading(true);
     setError(null);
     try {
-      const state = await getCareer();
+      const state = await getCareer(activeCareer?.id);
       setCareer(state.career);
+      setActiveCareer(state.career);
       if (state.league) {
         setLeague(state.league);
         const tableRes = await getLeagueTable(state.league.id);
@@ -55,7 +59,7 @@ export default function CareerHubScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, activeCareer?.id]);
 
   useEffect(() => {
     if (token) loadCareer();
@@ -70,6 +74,7 @@ export default function CareerHubScreen() {
     try {
       const res = await startCareer();
       setCareer(res.career);
+      setActiveCareer(res.career);
       setLeague(res.league);
       const tableRes = await getLeagueTable(res.league.id);
       setTable(tableRes.table);
@@ -98,6 +103,30 @@ export default function CareerHubScreen() {
     }
   };
 
+  const handleRetire = () => {
+    if (!career) return;
+    Alert.alert(
+      'Aposentar',
+      'Tem certeza que quer encerrar esta carreira? Todos os dados serão perdidos.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Aposentar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCareer(career.id);
+              clearCareer();
+              router.replace('/');
+            } catch {
+              Alert.alert('Erro', 'Não foi possível encerrar a carreira.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (!token) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -109,11 +138,7 @@ export default function CareerHubScreen() {
             <Text style={styles.ctaBtnText}>Fazer Login</Text>
           </TouchableOpacity>
         </View>
-        <AuthModal
-          visible={authVisible}
-          onClose={() => setAuthVisible(false)}
-          onSuccess={() => setAuthVisible(false)}
-        />
+        <AuthModal visible={authVisible} onClose={() => setAuthVisible(false)} onSuccess={() => setAuthVisible(false)} />
       </SafeAreaView>
     );
   }
@@ -152,8 +177,8 @@ export default function CareerHubScreen() {
           <View style={styles.noCareerCard}>
             <Text style={styles.noCareerTitle}>Iniciar Carreira</Text>
             <Text style={styles.noCareerSub}>
-              Comece com o {selectedTeam.name} e dispute múltiplas temporadas com
-              promoção e rebaixamento entre Série A e Série B.
+              Comece com o {selectedTeam.name} e dispute múltiplas temporadas com promoção
+              e rebaixamento entre Série A e Série B.
             </Text>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
             <TouchableOpacity
@@ -161,10 +186,7 @@ export default function CareerHubScreen() {
               onPress={handleStartCareer}
               disabled={actionLoading}
             >
-              {actionLoading
-                ? <ActivityIndicator color={C.bg} />
-                : <Text style={styles.ctaBtnText}>⚽  Iniciar Carreira</Text>
-              }
+              {actionLoading ? <ActivityIndicator color={C.bg} /> : <Text style={styles.ctaBtnText}>⚽  Iniciar Carreira</Text>}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -182,13 +204,20 @@ export default function CareerHubScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <ClubHeader
-          team={selectedTeam}
-          position={myRow?.position}
-          points={myRow?.points}
-          division={divisionLabel(career.division)}
-          season={career.season_number}
-        />
+        {/* Club header + manage gear */}
+        <View style={styles.headerRow}>
+          <ClubHeader
+            team={selectedTeam}
+            position={myRow?.position}
+            points={myRow?.points}
+            division={divisionLabel(career.division)}
+            season={career.season_number}
+            flex
+          />
+          <TouchableOpacity style={styles.gearBtn} onPress={() => setManageVisible(true)}>
+            <Text style={styles.gearIcon}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
 
         {league && (
           <View style={styles.seasonCard}>
@@ -200,7 +229,7 @@ export default function CareerHubScreen() {
               <View style={styles.progressBar}>
                 <View style={[
                   styles.progressFill,
-                  { width: `${Math.min(100, ((league.next_round - 1) / league.total_rounds) * 100)}%` as any }
+                  { width: `${Math.min(100, ((league.next_round - 1) / league.total_rounds) * 100)}%` as any },
                 ]} />
               </View>
             )}
@@ -259,19 +288,13 @@ export default function CareerHubScreen() {
                   onPress={() => setSelectedResult(r)}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[styles.resultTeam, r.home_goals > r.away_goals && styles.resultWinner]}
-                    numberOfLines={1}
-                  >
+                  <Text style={[styles.resultTeam, r.home_goals > r.away_goals && styles.resultWinner]} numberOfLines={1}>
                     {r.home_name}
                   </Text>
                   <View style={styles.resultScoreWrap}>
                     <Text style={styles.resultScore}>{r.home_goals} – {r.away_goals}</Text>
                   </View>
-                  <Text
-                    style={[styles.resultTeam, styles.resultTeamRight, r.away_goals > r.home_goals && styles.resultWinner]}
-                    numberOfLines={1}
-                  >
+                  <Text style={[styles.resultTeam, styles.resultTeamRight, r.away_goals > r.home_goals && styles.resultWinner]} numberOfLines={1}>
                     {r.away_name}
                   </Text>
                 </TouchableOpacity>
@@ -289,9 +312,7 @@ export default function CareerHubScreen() {
                 return (
                   <View key={row.team_id} style={[styles.tableRow, isMine && styles.tableRowMine]}>
                     <Text style={styles.tablePos}>{row.position}</Text>
-                    <Text style={[styles.tableName, isMine && styles.tableNameMine]} numberOfLines={1}>
-                      {row.name}
-                    </Text>
+                    <Text style={[styles.tableName, isMine && styles.tableNameMine]} numberOfLines={1}>{row.name}</Text>
                     <Text style={styles.tablePts}>{row.points}</Text>
                   </View>
                 );
@@ -301,31 +322,71 @@ export default function CareerHubScreen() {
         )}
       </ScrollView>
 
-      <MatchDetailsModal
-        visible={selectedResult !== null}
-        result={selectedResult}
-        onClose={() => setSelectedResult(null)}
+      <ManageModal
+        visible={manageVisible}
+        onClose={() => setManageVisible(false)}
+        onChangeTeam={() => { setManageVisible(false); router.push('/select-team'); }}
+        onRetire={() => { setManageVisible(false); handleRetire(); }}
       />
-      <AuthModal
-        visible={authVisible}
-        onClose={() => setAuthVisible(false)}
-        onSuccess={() => setAuthVisible(false)}
-      />
+
+      <MatchDetailsModal visible={selectedResult !== null} result={selectedResult} onClose={() => setSelectedResult(null)} />
+      <AuthModal visible={authVisible} onClose={() => setAuthVisible(false)} onSuccess={() => setAuthVisible(false)} />
     </SafeAreaView>
   );
 }
 
+function ManageModal({
+  visible, onClose, onChangeTeam, onRetire,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onChangeTeam: () => void;
+  onRetire: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={mgmt.backdrop} onPress={onClose} activeOpacity={1}>
+        <View style={mgmt.sheet}>
+          <View style={mgmt.handle} />
+          <Text style={mgmt.title}>Gerenciar Carreira</Text>
+
+          <TouchableOpacity style={mgmt.item} onPress={onChangeTeam} activeOpacity={0.8}>
+            <Text style={mgmt.itemIcon}>🔄</Text>
+            <View>
+              <Text style={mgmt.itemLabel}>Mudar de Time</Text>
+              <Text style={mgmt.itemSub}>Escolha outro clube para gerenciar</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[mgmt.item, mgmt.itemDanger]} onPress={onRetire} activeOpacity={0.8}>
+            <Text style={mgmt.itemIcon}>🏖️</Text>
+            <View>
+              <Text style={[mgmt.itemLabel, { color: C.red }]}>Aposentar</Text>
+              <Text style={mgmt.itemSub}>Encerrar esta carreira definitivamente</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={mgmt.cancelBtn} onPress={onClose}>
+            <Text style={mgmt.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 function ClubHeader({
-  team, position, points, division, season,
+  team, position, points, division, season, flex,
 }: {
   team: { shortName: string; name: string; division: string; budget: number };
   position?: number;
   points?: number;
   division?: string;
   season?: number;
+  flex?: boolean;
 }) {
   return (
-    <View style={styles.clubHeader}>
+    <View style={[styles.clubHeader, flex && { flex: 1 }]}>
       <View style={styles.clubBadge}>
         <Text style={styles.clubBadgeText}>{team.shortName}</Text>
       </View>
@@ -365,6 +426,27 @@ function MenuCard({
   );
 }
 
+const mgmt = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: C.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, paddingBottom: 36, borderTopWidth: 1, borderTopColor: C.border,
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 20 },
+  title: { color: C.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 16 },
+  item: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, paddingHorizontal: 12,
+    backgroundColor: C.bgSurface, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: C.border,
+  },
+  itemDanger: { borderColor: `${C.red}30` },
+  itemIcon: { fontSize: 22 },
+  itemLabel: { color: C.textPrimary, fontSize: 15, fontWeight: '600' },
+  itemSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+  cancelBtn: { marginTop: 8, paddingVertical: 14, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.border },
+  cancelText: { color: C.textMuted, fontSize: 15 },
+});
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   container: { padding: 16, paddingBottom: 48 },
@@ -375,9 +457,15 @@ const styles = StyleSheet.create({
   ctaBtn: { backgroundColor: C.green, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, alignItems: 'center', minWidth: 180 },
   ctaBtnDisabled: { opacity: 0.5 },
   ctaBtnText: { color: C.bg, fontSize: 16, fontWeight: '800' },
+  headerRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginBottom: 12 },
+  gearBtn: {
+    backgroundColor: C.bgCard, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center', width: 44,
+  },
+  gearIcon: { fontSize: 20 },
   clubHeader: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.bgCard,
-    borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: C.border,
+    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border,
   },
   clubBadge: {
     width: 48, height: 48, borderRadius: 10, backgroundColor: C.greenMuted,
@@ -408,15 +496,9 @@ const styles = StyleSheet.create({
   playBtnIcon: { fontSize: 22, color: C.bg },
   playBtnLabel: { color: C.bg, fontSize: 17, fontWeight: '800' },
   playBtnSub: { color: C.bg, fontSize: 12, opacity: 0.7, marginTop: 2 },
-  sectionLabel: {
-    color: C.textMuted, fontSize: 11, fontWeight: '700',
-    letterSpacing: 1.5, marginBottom: 10, marginTop: 8,
-  },
+  sectionLabel: { color: C.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10, marginTop: 8 },
   menuGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  menuCard: {
-    width: '47.5%', backgroundColor: C.bgCard, borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: C.border,
-  },
+  menuCard: { width: '47.5%', backgroundColor: C.bgCard, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.border },
   menuIcon: { fontSize: 24, marginBottom: 8 },
   menuTitle: { color: C.textPrimary, fontSize: 15, fontWeight: '700' },
   menuSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },

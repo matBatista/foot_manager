@@ -7,6 +7,9 @@ export interface Career {
   season_number: number;
   active_league_id?: string;
   division: string;
+  nickname: string;
+  team_name?: string;
+  team_abbr?: string;
   created_at: string;
 }
 
@@ -46,14 +49,32 @@ export function divisionLabel(division: string): string {
   return division === 'serie_a' ? 'Série A' : 'Série B';
 }
 
-export async function getCareer(): Promise<CareerState> {
-  const res = await api.get<CareerState>('/api/v1/career');
+export async function listCareers(): Promise<Career[]> {
+  const res = await api.get<Career[]>('/api/v1/career/list');
   return res.data;
 }
 
-export async function startCareer(): Promise<StartCareerResponse> {
-  const res = await api.post<StartCareerResponse>('/api/v1/career');
+export async function getCareer(id?: string): Promise<CareerState> {
+  const url = id ? `/api/v1/career/${id}` : '/api/v1/career';
+  const res = await api.get<CareerState>(url);
   return res.data;
+}
+
+export async function startCareer(nickname?: string): Promise<StartCareerResponse> {
+  const res = await api.post<StartCareerResponse>('/api/v1/career', { nickname: nickname ?? '' });
+  return res.data;
+}
+
+export async function deleteCareer(id: string): Promise<void> {
+  await api.delete(`/api/v1/career/${id}`);
+}
+
+export async function changeCareerTeam(careerId: string, teamId: string): Promise<void> {
+  await api.put(`/api/v1/career/${careerId}/team`, { team_id: teamId });
+}
+
+export async function updateFormation(formation: string): Promise<void> {
+  await api.put('/api/v1/career/formation', { formation });
 }
 
 export async function nextSeason(): Promise<NextSeasonResponse> {
