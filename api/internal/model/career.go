@@ -11,7 +11,12 @@ type Career struct {
 	SeasonNumber   int       `json:"season_number"`
 	ActiveLeagueID string    `json:"active_league_id,omitempty"`
 	Division       string    `json:"division"`
+	Nickname       string    `json:"nickname"`
 	CreatedAt      time.Time `json:"created_at"`
+
+	// Display fields — not stored in DB, populated by handler.
+	TeamName string `json:"team_name,omitempty"`
+	TeamAbbr string `json:"team_abbr,omitempty"`
 }
 
 // SeasonRecord is the permanent log entry written at the end of each season.

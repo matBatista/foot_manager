@@ -14,14 +14,24 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// allowedFormations is the set of valid formation strings.
+var allowedFormations = map[string]bool{
+	"4-4-2":   true,
+	"4-3-3":   true,
+	"4-5-1":   true,
+	"3-5-2":   true,
+	"5-3-2":   true,
+	"4-2-3-1": true,
+}
+
 // CareerHandler drives multi-season progression: start career, conclude a
 // season (with auto-simulated second division), advance to the next season.
 type CareerHandler struct {
-	career  *repository.CareerRepository
+	career   *repository.CareerRepository
 	managers *repository.ManagerRepository
-	teams   *repository.TeamRepository
-	players *repository.PlayerRepository
-	league  *LeagueHandler
+	teams    *repository.TeamRepository
+	players  *repository.PlayerRepository
+	league   *LeagueHandler
 }
 
 func NewCareerHandler(
@@ -112,8 +122,9 @@ func (h *CareerHandler) autoSimulateDivision(ctx context.Context, division strin
 
 // ---- handlers ----
 
-// StartCareer creates a new career for the authenticated manager, assigns the
-// manager to Série A by default, and immediately generates the first season.
+// StartCareer creates a new career for the authenticated manager. Multiple
+// careers per manager are allowed. Accepts an optional JSON body
+// {"nickname": "..."} to label the career.
 //
 // POST /api/v1/career
 func (h *CareerHandler) StartCareer(c *fiber.Ctx) error {
@@ -122,10 +133,11 @@ func (h *CareerHandler) StartCareer(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Fail fast if a career already exists.
-	if _, err := h.career.GetByManagerID(c.Context(), managerID); err == nil {
-		return fiber.NewError(fiber.StatusConflict, "career already exists — use GET /career or POST /career/next-season")
+	var body struct {
+		Nickname string `json:"nickname"`
 	}
+	// Ignore parse errors — nickname is optional.
+	_ = c.BodyParser(&body)
 
 	division := "serie_a"
 
@@ -134,7 +146,7 @@ func (h *CareerHandler) StartCareer(c *fiber.Ctx) error {
 		return err
 	}
 
-	career, err := h.career.Create(c.Context(), managerID, division)
+	career, err := h.career.Create(c.Context(), managerID, division, body.Nickname)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to create career")
 	}
@@ -153,8 +165,8 @@ func (h *CareerHandler) StartCareer(c *fiber.Ctx) error {
 	})
 }
 
-// GetCareer returns the authenticated manager's current career state and the
-// active league summary.
+// GetCareer returns the authenticated manager's most recent career state and
+// the active league summary. Kept for backward compatibility.
 //
 // GET /api/v1/career
 func (h *CareerHandler) GetCareer(c *fiber.Ctx) error {
@@ -182,6 +194,140 @@ func (h *CareerHandler) GetCareer(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(resp)
+}
+
+// ListCareers returns all careers for the authenticated manager.
+//
+// GET /api/v1/career/list
+func (h *CareerHandler) ListCareers(c *fiber.Ctx) error {
+	managerID, err := requireManagerID(c)
+	if err != nil {
+		return err
+	}
+
+	careers, err := h.career.ListByManagerID(c.Context(), managerID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to list careers")
+	}
+	return c.JSON(careers)
+}
+
+// GetCareerByID returns a specific career by ID (must belong to the manager).
+//
+// GET /api/v1/career/:id
+func (h *CareerHandler) GetCareerByID(c *fiber.Ctx) error {
+	managerID, err := requireManagerID(c)
+	if err != nil {
+		return err
+	}
+
+	careerID := c.Params("id")
+	career, err := h.career.GetByID(c.Context(), careerID, managerID)
+	if errors.Is(err, repository.ErrCareerNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, "career not found")
+	}
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to load career")
+	}
+
+	resp := fiber.Map{"career": career}
+
+	if career.ActiveLeagueID != "" {
+		if st, ok := h.league.lookupOrLoad(c.Context(), career.ActiveLeagueID); ok {
+			h.league.mu.Lock()
+			resp["league"] = summaryOf(career.ActiveLeagueID, st)
+			h.league.mu.Unlock()
+		}
+	}
+
+	return c.JSON(resp)
+}
+
+// DeleteCareer retires (deletes) a career. Returns 404 if the career does not
+// belong to the manager.
+//
+// DELETE /api/v1/career/:id
+func (h *CareerHandler) DeleteCareer(c *fiber.Ctx) error {
+	managerID, err := requireManagerID(c)
+	if err != nil {
+		return err
+	}
+
+	careerID := c.Params("id")
+	if err := h.career.Delete(c.Context(), careerID, managerID); err != nil {
+		if errors.Is(err, repository.ErrCareerNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "career not found")
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to delete career")
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ChangeTeam updates the manager's assigned team for a given career. The
+// career must belong to the authenticated manager.
+//
+// PUT /api/v1/career/:id/team
+func (h *CareerHandler) ChangeTeam(c *fiber.Ctx) error {
+	managerID, err := requireManagerID(c)
+	if err != nil {
+		return err
+	}
+
+	careerID := c.Params("id")
+
+	// Verify career ownership.
+	if _, err := h.career.GetByID(c.Context(), careerID, managerID); err != nil {
+		if errors.Is(err, repository.ErrCareerNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "career not found")
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to verify career")
+	}
+
+	var body struct {
+		TeamID string `json:"team_id"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.TeamID == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "team_id is required")
+	}
+
+	// Verify team exists.
+	if _, err := h.teams.GetByID(c.Context(), body.TeamID); err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "team not found")
+	}
+
+	if err := h.managers.UpdateTeamID(c.Context(), managerID, body.TeamID); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to update team")
+	}
+
+	return c.JSON(fiber.Map{"team_id": body.TeamID})
+}
+
+// UpdateFormation sets the manager's preferred formation.
+//
+// PUT /api/v1/career/formation
+func (h *CareerHandler) UpdateFormation(c *fiber.Ctx) error {
+	managerID, err := requireManagerID(c)
+	if err != nil {
+		return err
+	}
+
+	var body struct {
+		Formation string `json:"formation"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.Formation == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "formation is required")
+	}
+
+	if !allowedFormations[body.Formation] {
+		return fiber.NewError(fiber.StatusUnprocessableEntity,
+			"invalid formation — allowed: 4-4-2, 4-3-3, 4-5-1, 3-5-2, 5-3-2, 4-2-3-1")
+	}
+
+	if err := h.managers.UpdateFormation(c.Context(), managerID, body.Formation); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to update formation")
+	}
+
+	return c.JSON(fiber.Map{"formation": body.Formation})
 }
 
 // NextSeason concludes the current season, applies promotion/relegation,

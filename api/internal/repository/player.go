@@ -18,14 +18,14 @@ func NewPlayerRepository(pool *pgxpool.Pool) *PlayerRepository {
 }
 
 const playerColumns = `id, COALESCE(team_id::text, ''), name, position, nationality, age,
-	pace, shooting, passing, dribbling, defending, physical, overall, value`
+	pace, shooting, passing, dribbling, defending, physical, overall, value, shirt_number`
 
 func scanPlayer(row pgx.CollectableRow) (model.Player, error) {
 	var p model.Player
 	err := row.Scan(
 		&p.ID, &p.TeamID, &p.Name, &p.Position, &p.Nationality, &p.Age,
 		&p.Pace, &p.Shooting, &p.Passing, &p.Dribbling, &p.Defending,
-		&p.Physical, &p.Overall, &p.Value,
+		&p.Physical, &p.Overall, &p.Value, &p.ShirtNumber,
 	)
 	return p, err
 }

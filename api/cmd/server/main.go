@@ -51,7 +51,7 @@ func main() {
 	teamHandler := handler.NewTeamHandler(teamRepo)
 	matchHandler := handler.NewMatchHandler(playerRepo)
 	leagueHandler := handler.NewLeagueHandler(teamRepo, playerRepo, saveGameRepo, activeLeagueRepo)
-	marketHandler := handler.NewMarketHandler(transferRepo)
+	marketHandler := handler.NewMarketHandler(transferRepo, careerRepo, leagueHandler)
 	careerHandler := handler.NewCareerHandler(careerRepo, managerRepo, teamRepo, playerRepo, leagueHandler)
 
 	app := fiber.New(fiber.Config{AppName: "ManagerFC API"})
@@ -108,8 +108,14 @@ func main() {
 	career := v1.Group("/career", middleware.RequireAuth(jwtSecret))
 	career.Post("/", careerHandler.StartCareer)
 	career.Get("/", careerHandler.GetCareer)
+	career.Get("/list", careerHandler.ListCareers)
 	career.Post("/next-season", careerHandler.NextSeason)
 	career.Get("/history", careerHandler.GetHistory)
+	// Formation must be registered before /:id to avoid route conflicts.
+	career.Put("/formation", careerHandler.UpdateFormation)
+	career.Get("/:id", careerHandler.GetCareerByID)
+	career.Delete("/:id", careerHandler.DeleteCareer)
+	career.Put("/:id/team", careerHandler.ChangeTeam)
 
 	port := os.Getenv("PORT")
 	if port == "" {

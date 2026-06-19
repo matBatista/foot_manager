@@ -22,17 +22,17 @@ func NewCareerRepository(pool *pgxpool.Pool) *CareerRepository {
 	return &CareerRepository{pool: pool}
 }
 
-// Create inserts a new career record for the manager. The manager must not
-// already have a career (UNIQUE constraint on manager_id).
-func (r *CareerRepository) Create(ctx context.Context, managerID, division string) (model.Career, error) {
+// Create inserts a new career record for the manager. Multiple careers per
+// manager are allowed; nickname labels this career for display.
+func (r *CareerRepository) Create(ctx context.Context, managerID, division, nickname string) (model.Career, error) {
 	var c model.Career
 	var leagueID *string
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO careers (manager_id, division)
-         VALUES ($1, $2)
-         RETURNING id, manager_id, season_number, active_league_id, division, created_at`,
-		managerID, division,
-	).Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.CreatedAt)
+		`INSERT INTO careers (manager_id, division, nickname)
+         VALUES ($1, $2, $3)
+         RETURNING id, manager_id, season_number, active_league_id, division, nickname, created_at`,
+		managerID, division, nickname,
+	).Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.Nickname, &c.CreatedAt)
 	if err != nil {
 		return model.Career{}, fmt.Errorf("creating career: %w", err)
 	}
@@ -42,15 +42,15 @@ func (r *CareerRepository) Create(ctx context.Context, managerID, division strin
 	return c, nil
 }
 
-// GetByManagerID returns the career for the given manager.
+// GetByManagerID returns the most recent career for the given manager.
 func (r *CareerRepository) GetByManagerID(ctx context.Context, managerID string) (model.Career, error) {
 	var c model.Career
 	var leagueID *string
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, manager_id, season_number, active_league_id, division, created_at
-         FROM careers WHERE manager_id = $1`,
+		`SELECT id, manager_id, season_number, active_league_id, division, nickname, created_at
+         FROM careers WHERE manager_id = $1 ORDER BY created_at DESC LIMIT 1`,
 		managerID,
-	).Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.CreatedAt)
+	).Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.Nickname, &c.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Career{}, ErrCareerNotFound
 	}
@@ -61,6 +61,72 @@ func (r *CareerRepository) GetByManagerID(ctx context.Context, managerID string)
 		c.ActiveLeagueID = *leagueID
 	}
 	return c, nil
+}
+
+// GetByID returns a specific career by ID, verifying manager ownership.
+func (r *CareerRepository) GetByID(ctx context.Context, careerID, managerID string) (model.Career, error) {
+	var c model.Career
+	var leagueID *string
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, manager_id, season_number, active_league_id, division, nickname, created_at
+         FROM careers WHERE id = $1 AND manager_id = $2`,
+		careerID, managerID,
+	).Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.Nickname, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Career{}, ErrCareerNotFound
+	}
+	if err != nil {
+		return model.Career{}, fmt.Errorf("loading career: %w", err)
+	}
+	if leagueID != nil {
+		c.ActiveLeagueID = *leagueID
+	}
+	return c, nil
+}
+
+// ListByManagerID returns all careers for the given manager, newest first.
+func (r *CareerRepository) ListByManagerID(ctx context.Context, managerID string) ([]model.Career, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, manager_id, season_number, active_league_id, division, nickname, created_at
+         FROM careers WHERE manager_id = $1 ORDER BY created_at DESC`,
+		managerID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing careers: %w", err)
+	}
+	defer rows.Close()
+	var careers []model.Career
+	for rows.Next() {
+		var c model.Career
+		var leagueID *string
+		if err := rows.Scan(&c.ID, &c.ManagerID, &c.SeasonNumber, &leagueID, &c.Division, &c.Nickname, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning career: %w", err)
+		}
+		if leagueID != nil {
+			c.ActiveLeagueID = *leagueID
+		}
+		careers = append(careers, c)
+	}
+	if careers == nil {
+		careers = []model.Career{}
+	}
+	return careers, rows.Err()
+}
+
+// Delete removes a career. Returns ErrCareerNotFound if the career does not
+// belong to the manager.
+func (r *CareerRepository) Delete(ctx context.Context, careerID, managerID string) error {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM careers WHERE id = $1 AND manager_id = $2`,
+		careerID, managerID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleting career: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrCareerNotFound
+	}
+	return nil
 }
 
 // Update writes the mutable fields of a career back to the DB.

@@ -17,11 +17,11 @@ func NewManagerRepository(pool *pgxpool.Pool) *ManagerRepository {
 	return &ManagerRepository{pool: pool}
 }
 
-const managerColumns = `id, name, email, password_hash, COALESCE(team_id::text, ''), reputation, created_at`
+const managerColumns = `id, name, email, password_hash, COALESCE(team_id::text, ''), reputation, formation, created_at`
 
 func scanManager(row pgx.CollectableRow) (model.Manager, error) {
 	var m model.Manager
-	err := row.Scan(&m.ID, &m.Name, &m.Email, &m.PasswordHash, &m.TeamID, &m.Reputation, &m.CreatedAt)
+	err := row.Scan(&m.ID, &m.Name, &m.Email, &m.PasswordHash, &m.TeamID, &m.Reputation, &m.Formation, &m.CreatedAt)
 	return m, err
 }
 
@@ -75,4 +75,13 @@ func (r *ManagerRepository) GetByID(ctx context.Context, id string) (model.Manag
 		return model.Manager{}, fmt.Errorf("querying manager by id: %w", err)
 	}
 	return pgx.CollectOneRow(rows, scanManager)
+}
+
+// UpdateFormation sets the manager's preferred formation.
+func (r *ManagerRepository) UpdateFormation(ctx context.Context, managerID, formation string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE managers SET formation = $1 WHERE id = $2`,
+		formation, managerID,
+	)
+	return err
 }

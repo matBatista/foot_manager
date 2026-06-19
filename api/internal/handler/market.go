@@ -10,10 +10,23 @@ import (
 
 type MarketHandler struct {
 	transfers *repository.TransferRepository
+	careers   *repository.CareerRepository
+	league    *LeagueHandler
 }
 
-func NewMarketHandler(transfers *repository.TransferRepository) *MarketHandler {
-	return &MarketHandler{transfers: transfers}
+func NewMarketHandler(
+	transfers *repository.TransferRepository,
+	careers *repository.CareerRepository,
+	league *LeagueHandler,
+) *MarketHandler {
+	return &MarketHandler{transfers: transfers, careers: careers, league: league}
+}
+
+// isTransferWindowOpen returns true if the given round is within an open
+// transfer window. Windows are open in rounds 1–5 (start of season) and
+// rounds 19–21 (winter break).
+func isTransferWindowOpen(round int) bool {
+	return (round >= 1 && round <= 5) || (round >= 19 && round <= 21)
 }
 
 // Budget returns the authenticated manager's current team budget.
@@ -45,9 +58,35 @@ func (h *MarketHandler) Available(c *fiber.Ctx) error {
 
 // Buy purchases a free-agent player for the manager's team.
 // POST /api/v1/market/buy/:player_id
+//
+// Transfer window enforcement: if the manager has an active career with an
+// active league, the purchase is only allowed during open transfer windows
+// (rounds 1–5 and 19–21). Managers without a career can always buy.
 func (h *MarketHandler) Buy(c *fiber.Ctx) error {
 	managerID := middleware.ManagerID(c)
 	playerID := c.Params("player_id")
+
+	// Transfer window check.
+	if h.careers != nil && h.league != nil && managerID != "" {
+		career, err := h.careers.GetByManagerID(c.Context(), managerID)
+		if err == nil && career.ActiveLeagueID != "" {
+			if st, ok := h.league.lookupOrLoad(c.Context(), career.ActiveLeagueID); ok {
+				h.league.mu.Lock()
+				// NextRound is 1-based and points to the NEXT round to be played.
+				// The current round is NextRound - 1 (or 1 if no rounds played yet).
+				currentRound := st.season.NextRound() - 1
+				if currentRound < 1 {
+					currentRound = 1
+				}
+				h.league.mu.Unlock()
+
+				if !isTransferWindowOpen(currentRound) {
+					return fiber.NewError(fiber.StatusLocked,
+						"Janela de transferências fechada. Abre nas rodadas 1–5 e 19–21.")
+				}
+			}
+		}
+	}
 
 	newBudget, err := h.transfers.BuyPlayer(c.Context(), managerID, playerID)
 	if err != nil {

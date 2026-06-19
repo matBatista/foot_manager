@@ -18,13 +18,18 @@ func NewSquadHandler(players *repository.PlayerRepository, managers *repository.
 // GetSquad returns the squad for the authenticated manager's team.
 // Unauthenticated callers may pass ?team_id=<uuid> to view any team's squad.
 // Returns an empty squad when no team can be resolved.
+// The response includes the manager's preferred formation when authenticated.
 func (h *SquadHandler) GetSquad(c *fiber.Ctx) error {
 	var teamID string
+	formation := "4-4-2" // default
 
 	if managerID := middleware.ManagerID(c); managerID != "" {
 		manager, err := h.managers.GetByID(c.Context(), managerID)
 		if err == nil {
 			teamID = manager.TeamID
+			if manager.Formation != "" {
+				formation = manager.Formation
+			}
 		}
 	}
 
@@ -33,12 +38,12 @@ func (h *SquadHandler) GetSquad(c *fiber.Ctx) error {
 	}
 
 	if teamID == "" {
-		return c.JSON(fiber.Map{"players": []struct{}{}, "total": 0})
+		return c.JSON(fiber.Map{"formation": formation, "players": []struct{}{}, "total": 0})
 	}
 
 	squad, err := h.players.ListByTeam(c.Context(), teamID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to load squad")
 	}
-	return c.JSON(fiber.Map{"players": squad, "total": len(squad)})
+	return c.JSON(fiber.Map{"formation": formation, "players": squad, "total": len(squad)})
 }

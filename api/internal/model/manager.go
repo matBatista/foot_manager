@@ -9,5 +9,6 @@ type Manager struct {
 	PasswordHash string    `json:"-"`
 	TeamID       string    `json:"team_id"`
 	Reputation   int       `json:"reputation"`
+	Formation    string    `json:"formation"`
 	CreatedAt    time.Time `json:"created_at"`
 }

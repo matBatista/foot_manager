@@ -73,10 +73,15 @@ const (
 type EventType string
 
 const (
-	EventGoal       EventType = "goal"
-	EventShot       EventType = "shot" // off target or saved
-	EventYellowCard EventType = "yellow_card"
-	EventRedCard    EventType = "red_card"
+	EventGoal            EventType = "goal"
+	EventShot            EventType = "shot" // off target or saved
+	EventYellowCard      EventType = "yellow_card"
+	EventRedCard         EventType = "red_card"
+	EventCorner          EventType = "corner"
+	EventFoul            EventType = "foul"
+	EventDangerousAttack EventType = "dangerous_attack"
+	EventCounterAttack   EventType = "counter_attack"
+	EventHalfTime        EventType = "half_time"
 )
 
 // Event is a single moment in the match timeline.
@@ -169,6 +174,7 @@ func Simulate(home, away TeamInput, seed int64) (Result, error) {
 	}
 
 	homeMinutes := 0
+	prevHomeHadPossession := true // track possession changes for counter-attack detection
 	for minute := 1; minute <= matchMinutes; minute++ {
 		// Possession is recomputed each minute from effective midfield, so a
 		// red card or fatigue shifts the balance of play as the game wears on.
@@ -176,13 +182,20 @@ func Simulate(home, away TeamInput, seed int64) (Result, error) {
 		aMid := a.effMidfield(minute)
 		homePossWeight := hMid / (hMid + aMid)
 
-		if rng.Float64() < homePossWeight {
+		homeHasPossession := rng.Float64() < homePossWeight
+		possessionSwitched := homeHasPossession != prevHomeHadPossession
+		prevHomeHadPossession = homeHasPossession
+
+		if homeHasPossession {
 			homeMinutes++
-			simulateMinute(rng, minute, &h, &a, &result.Home, &result.Away, &result.Events)
+			simulateMinute(rng, minute, &h, &a, &result.Home, &result.Away, &result.Events, possessionSwitched)
 		} else {
-			simulateMinute(rng, minute, &a, &h, &result.Away, &result.Home, &result.Events)
+			simulateMinute(rng, minute, &a, &h, &result.Away, &result.Home, &result.Events, possessionSwitched)
 		}
 	}
+
+	// Insert half-time marker between first and second halves.
+	result.Events = append(result.Events, Event{Minute: 45, Type: EventHalfTime, TeamID: ""})
 
 	// Convert possession-minutes into a clean percentage.
 	result.Home.Possession = int(float64(homeMinutes)/matchMinutes*100 + 0.5)
@@ -222,8 +235,9 @@ func Simulate(home, away TeamInput, seed int64) (Result, error) {
 }
 
 // simulateMinute resolves one minute for the team in possession (att) against
-// the defending team (def), appending any events produced.
-func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defStats *TeamStats, events *[]Event) {
+// the defending team (def), appending any events produced. possessionSwitched
+// indicates that possession just changed hands (used for counter-attack detection).
+func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defStats *TeamStats, events *[]Event, possessionSwitched bool) {
 	// Chance creation scales with effective attack vs the opponent's defence.
 	atk := att.effAttack(minute)
 	dfc := def.effDefence(minute)
@@ -232,6 +246,13 @@ func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defS
 		// No chance — but discipline events can still happen.
 		applyDiscipline(rng, minute, def, defStats, events)
 		return
+	}
+
+	// A chance was created. If possession just switched, this is a counter-attack.
+	if possessionSwitched {
+		*events = append(*events, Event{
+			Minute: minute, Type: EventCounterAttack, TeamID: att.teamID,
+		})
 	}
 
 	// A chance was created → it becomes a shot.
@@ -252,11 +273,17 @@ func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defS
 
 	// On target?
 	if rng.Float64() >= onTargetProb {
-		// Off target.
-		*events = append(*events, Event{
-			Minute: minute, Type: EventShot, TeamID: att.teamID,
-			Player: shooter.Name, Detail: "off target",
-		})
+		// Off target — ~35% chance this produces a corner.
+		if rng.Float64() < 0.35 {
+			*events = append(*events, Event{
+				Minute: minute, Type: EventCorner, TeamID: att.teamID,
+			})
+		} else {
+			*events = append(*events, Event{
+				Minute: minute, Type: EventShot, TeamID: att.teamID,
+				Player: shooter.Name, Detail: "off target",
+			})
+		}
 		return
 	}
 	attStats.ShotsOnTarget++
@@ -278,11 +305,15 @@ func simulateMinute(rng *rand.Rand, minute int, att, def *lineup, attStats, defS
 
 // applyDiscipline resolves fouls by the defending team: a foul may earn a
 // yellow (a second yellow becomes a red), and independently a reckless
-// challenge may be a straight red.
+// challenge may be a straight red. Fouls always emit an EventFoul first.
 func applyDiscipline(rng *rand.Rand, minute int, def *lineup, defStats *TeamStats, events *[]Event) {
 	// Straight red (rare).
 	if rng.Float64() < straightRedPerMinute {
 		if p, ok := def.pickOnField(rng); ok {
+			*events = append(*events, Event{
+				Minute: minute, Type: EventFoul, TeamID: def.teamID,
+				Player: p.Name,
+			})
 			sendOff(minute, def, defStats, p, "straight red", events)
 			return
 		}
@@ -296,6 +327,10 @@ func applyDiscipline(rng *rand.Rand, minute int, def *lineup, defStats *TeamStat
 	if !ok {
 		return
 	}
+	*events = append(*events, Event{
+		Minute: minute, Type: EventFoul, TeamID: def.teamID,
+		Player: p.Name,
+	})
 	def.bookings[p.ID]++
 	defStats.YellowCards++
 	*events = append(*events, Event{

@@ -1,0 +1,2 @@
+ALTER TABLE players DROP COLUMN IF EXISTS shirt_number;
+ALTER TABLE managers DROP COLUMN IF EXISTS formation;

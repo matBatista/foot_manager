@@ -19,4 +19,6 @@ type Player struct {
 	// Derived
 	Overall    int `json:"overall"`
 	Value      int64 `json:"value"` // in credits
+
+	ShirtNumber int `json:"shirt_number"`
 }
