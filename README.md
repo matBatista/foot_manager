@@ -8,16 +8,17 @@ Built as a portfolio project — Go REST API + React Native (Expo) mobile app.
 
 ## Screenshots
 
-> _Replace the placeholders below with actual screenshots of your running app._
+| Home | Seleção de time | Career Hub |
+|:---:|:---:|:---:|
+| ![Home](docs/screenshots/home.png) | ![Select team](docs/screenshots/select_team.png) | ![Career Hub](docs/screenshots/career_hub.png) |
 
-| League table | Match result | Squad view |
-|---|---|---|
-| ![league table](docs/screenshots/league_table.png) | ![match result](docs/screenshots/match_result.png) | ![squad](docs/screenshots/squad.png) |
+| Partida — campo | Partida — stats | Liga |
+|:---:|:---:|:---:|
+| ![Match field](docs/screenshots/match_field.png) | ![Match stats](docs/screenshots/match_stats.png) | ![League](docs/screenshots/league.png) |
 
-**How to add screenshots:**
-1. Run the app (`npm run web` inside `mobile/`)
-2. Take screenshots of the League, Match, and Squad tabs
-3. Save them to `docs/screenshots/` and update the paths above
+| Mercado | Categoria de Base |
+|:---:|:---:|
+| ![Market](docs/screenshots/market.png) | ![Academy](docs/screenshots/academy.png) |
 
 ---
 
@@ -51,8 +52,9 @@ foot_manager/
 │   │   └── repository/     # Postgres queries
 │   └── go.mod
 ├── mobile/     # React Native (Expo) — iOS / Android / Web
-│   ├── app/(tabs)/         # tab screens (League, Match, Squad)
-│   └── screens/            # screen components
+│   ├── app/(career)/       # career tab group (Hub, Elenco, Liga, Mercado, Base)
+│   ├── app/match.tsx       # match screen (career round + standalone)
+│   └── screens/            # reusable screen components
 └── docker-compose.yml      # local Postgres 16
 ```
 
