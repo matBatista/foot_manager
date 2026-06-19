@@ -14,6 +14,7 @@ import { fetchBudget, fetchAvailable, buyPlayer, sellPlayer } from '../services/
 import { fetchSquad, formatValue } from '../services/squadService';
 import { PlayerCard } from '../components/PlayerCard';
 import { useAuthStore } from '../store/authStore';
+import { C } from '../constants/theme';
 
 type Tab = 'available' | 'squad';
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
@@ -153,7 +154,7 @@ export default function MarketScreen() {
         )}
 
         {/* Content */}
-        {loading && <ActivityIndicator color="#e2b96f" style={{ marginTop: 40 }} />}
+        {loading && <ActivityIndicator color={C.green} style={{ marginTop: 40 }} />}
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         {!loading && !error && tab === 'available' && (
@@ -179,7 +180,7 @@ export default function MarketScreen() {
                   }
                 >
                   {actionLoading === item.id ? (
-                    <ActivityIndicator size="small" color="#1a1a2e" />
+                    <ActivityIndicator size="small" color={C.bg} />
                   ) : (
                     <Text style={styles.actionBtnText}>Buy</Text>
                   )}
@@ -213,7 +214,7 @@ export default function MarketScreen() {
                   disabled={actionLoading !== null}
                 >
                   {actionLoading === item.id ? (
-                    <ActivityIndicator size="small" color="#f1f5f9" />
+                    <ActivityIndicator size="small" color={C.textPrimary} />
                   ) : (
                     <Text style={[styles.actionBtnText, styles.sellBtnText]}>Sell</Text>
                   )}
@@ -243,7 +244,7 @@ function extractMessage(err: unknown, fallback: string): string {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bg,
   },
   container: {
     flex: 1,
@@ -251,18 +252,18 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 26,
     fontWeight: 'bold',
   },
   budget: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 13,
     marginTop: 2,
     marginBottom: 14,
   },
   budgetValue: {
-    color: '#e2b96f',
+    color: C.gold,
     fontWeight: '700',
   },
   tabRow: {
@@ -274,21 +275,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 9,
     borderRadius: 8,
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     alignItems: 'center',
   },
   tabBtnActive: {
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderWidth: 1,
-    borderColor: '#e2b96f',
+    borderColor: C.green,
   },
   tabBtnText: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 13,
     fontWeight: '600',
   },
   tabBtnTextActive: {
-    color: '#e2b96f',
+    color: C.green,
   },
   posRow: {
     flexDirection: 'row',
@@ -299,19 +300,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     alignItems: 'center',
   },
   posBtnActive: {
-    backgroundColor: '#e2b96f',
+    backgroundColor: C.green,
   },
   posBtnText: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 12,
     fontWeight: '600',
   },
   posBtnTextActive: {
-    color: '#1a1a2e',
+    color: C.bg,
   },
   list: {
     paddingBottom: 32,
@@ -333,10 +334,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buyBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: C.green,
   },
   sellBtn: {
-    backgroundColor: '#ef4444',
+    backgroundColor: C.red,
   },
   actionBtnDisabled: {
     opacity: 0.4,
@@ -350,13 +351,13 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   errorText: {
-    color: '#ef4444',
+    color: C.red,
     textAlign: 'center',
     marginTop: 40,
     fontSize: 14,
   },
   emptyText: {
-    color: '#64748b',
+    color: C.textMuted,
     textAlign: 'center',
     marginTop: 40,
     fontSize: 14,

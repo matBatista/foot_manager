@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { login, register } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
+import { C } from '../constants/theme';
 
 interface AuthModalProps {
   visible: boolean;
@@ -88,7 +89,7 @@ export default function AuthModal({ visible, onClose, onSuccess }: AuthModalProp
           <TextInput
             style={styles.input}
             placeholder="Nome"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={C.textMuted}
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -97,7 +98,7 @@ export default function AuthModal({ visible, onClose, onSuccess }: AuthModalProp
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={C.textMuted}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -106,7 +107,7 @@ export default function AuthModal({ visible, onClose, onSuccess }: AuthModalProp
         <TextInput
           style={styles.input}
           placeholder="Senha (mín. 8 caracteres)"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={C.textMuted}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -120,7 +121,7 @@ export default function AuthModal({ visible, onClose, onSuccess }: AuthModalProp
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#1a1a2e" />
+            <ActivityIndicator color={C.bg} />
           ) : (
             <Text style={styles.btnText}>{tab === 'login' ? 'Entrar' : 'Cadastrar'}</Text>
           )}
@@ -148,14 +149,16 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   card: {
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     borderRadius: 16,
     padding: 24,
     width: '100%',
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   title: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
@@ -163,26 +166,28 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderRadius: 8,
     marginBottom: 16,
     overflow: 'hidden',
   },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive: { backgroundColor: '#e2b96f' },
-  tabText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
-  tabTextActive: { color: '#1a1a2e' },
+  tabActive: { backgroundColor: C.green },
+  tabText: { color: C.textMuted, fontSize: 14, fontWeight: '600' },
+  tabTextActive: { color: C.bg },
   input: {
-    backgroundColor: '#0f3460',
-    color: '#f1f5f9',
+    backgroundColor: C.bgInput,
+    color: C.textPrimary,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   btn: {
-    backgroundColor: '#e2b96f',
+    backgroundColor: C.green,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -190,8 +195,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
-  errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 8, fontSize: 14 },
+  btnText: { color: C.bg, fontSize: 15, fontWeight: 'bold' },
+  errorText: { color: C.red, textAlign: 'center', marginVertical: 8, fontSize: 14 },
   cancelBtn: { marginTop: 10, alignItems: 'center' },
-  cancelText: { color: '#64748b', fontSize: 14 },
+  cancelText: { color: C.textMuted, fontSize: 14 },
 });

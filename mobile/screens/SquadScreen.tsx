@@ -13,6 +13,7 @@ import { fetchSquad } from '../services/squadService';
 import { PlayerCard } from '../components/PlayerCard';
 import { useTeamStore } from '../store/teamStore';
 import { useAuthStore } from '../store/authStore';
+import { C } from '../constants/theme';
 
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
 
@@ -65,7 +66,7 @@ export default function SquadScreen() {
         </View>
 
         {/* Content */}
-        {loading && <ActivityIndicator color="#e2b96f" style={{ marginTop: 40 }} />}
+        {loading && <ActivityIndicator color={C.green} style={{ marginTop: 40 }} />}
         {error && <Text style={styles.errorText}>{error}</Text>}
         {!loading && !error && (
           <FlatList
@@ -89,7 +90,7 @@ export default function SquadScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bg,
   },
   container: {
     flex: 1,
@@ -97,12 +98,12 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 26,
     fontWeight: 'bold',
   },
   count: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 13,
     marginTop: 2,
     marginBottom: 16,
@@ -116,25 +117,25 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: '#e2b96f',
+    backgroundColor: C.green,
   },
   tabText: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 13,
     fontWeight: '600',
   },
   tabTextActive: {
-    color: '#1a1a2e',
+    color: C.bg,
   },
   list: {
     paddingBottom: 32,
   },
   errorText: {
-    color: '#ef4444',
+    color: C.red,
     textAlign: 'center',
     marginTop: 40,
     fontSize: 14,

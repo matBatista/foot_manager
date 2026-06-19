@@ -19,6 +19,7 @@ import {
   teamForSelectionToStore,
   formatBudget,
 } from '../services/teamService';
+import { C } from '../constants/theme';
 
 type Section = { title: string; data: TeamForSelection[] };
 
@@ -67,7 +68,7 @@ export default function SelectTeamScreen() {
     try {
       await selectTeamOnServer(team.id);
       setTeam(teamForSelectionToStore(team));
-      router.replace('/');
+      router.replace('/(career)');
     } catch (e: any) {
       if (e?.response?.status === 409) {
         setError(
@@ -116,7 +117,7 @@ export default function SelectTeamScreen() {
             : 'Faça login para salvar sua escolha no servidor'}
         </Text>
 
-        {loading && <ActivityIndicator color="#e2b96f" style={{ marginTop: 40 }} />}
+        {loading && <ActivityIndicator color={C.green} style={{ marginTop: 40 }} />}
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -158,7 +159,7 @@ export default function SelectTeamScreen() {
                 </View>
                 <View style={styles.cardRight}>
                   {selecting === item.id ? (
-                    <ActivityIndicator size="small" color="#e2b96f" />
+                    <ActivityIndicator size="small" color={C.green} />
                   ) : (
                     <Text style={styles.chevron}>›</Text>
                   )}
@@ -181,7 +182,7 @@ export default function SelectTeamScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bg,
   },
   container: {
     flex: 1,
@@ -189,12 +190,12 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 26,
     fontWeight: 'bold',
   },
   sub: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 13,
     marginTop: 4,
     marginBottom: 20,
@@ -203,12 +204,12 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   sectionHeader: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bg,
     paddingVertical: 8,
     marginBottom: 4,
   },
   sectionTitle: {
-    color: '#e2b96f',
+    color: C.gold,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
@@ -217,25 +218,25 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
     marginBottom: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#0f3460',
+    borderLeftColor: C.border,
   },
   cardLeft: {
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   shortName: {
-    color: '#e2b96f',
+    color: C.green,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -244,12 +245,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   teamName: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
   teamMeta: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chevron: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 22,
     fontWeight: '300',
   },
@@ -268,20 +269,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   errorText: {
-    color: '#ef4444',
+    color: C.red,
     textAlign: 'center',
     fontSize: 14,
     marginBottom: 16,
     lineHeight: 20,
   },
   retryBtn: {
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   retryText: {
-    color: '#e2b96f',
+    color: C.green,
     fontWeight: '600',
   },
 });

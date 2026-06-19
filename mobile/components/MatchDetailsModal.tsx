@@ -9,6 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { MatchStats, ResultRow } from '../services/leagueService';
+import { C } from '../constants/theme';
 
 interface Props {
   visible: boolean;
@@ -111,16 +112,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bgCard,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 32,
     maxHeight: '85%',
+    borderTopWidth: 1,
+    borderColor: C.border,
   },
   sheetHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#334155',
+    backgroundColor: C.borderLight,
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
@@ -133,27 +136,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  roundLabel: { color: '#64748b', fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
-  closeBtn: { color: '#64748b', fontSize: 18, fontWeight: '600' },
+  roundLabel: { color: C.textMuted, fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
+  closeBtn: { color: C.textMuted, fontSize: 18, fontWeight: '600' },
 
   scoreCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgSurface,
     marginHorizontal: 16,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 12,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  teamName: { flex: 1, color: '#94a3b8', fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  teamName: { flex: 1, color: C.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   teamNameRight: { textAlign: 'center' },
-  winner: { color: '#f1f5f9', fontWeight: '700' },
-  score: { color: '#e2b96f', fontSize: 28, fontWeight: 'bold', paddingHorizontal: 16, minWidth: 80, textAlign: 'center' },
+  winner: { color: C.textPrimary, fontWeight: '700' },
+  score: { color: C.gold, fontSize: 28, fontWeight: 'bold', paddingHorizontal: 16, minWidth: 80, textAlign: 'center' },
 
   statsScroll: { paddingHorizontal: 16 },
   statsHeader: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,
@@ -161,19 +166,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  noStats: { color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 24 },
+  noStats: { color: C.textMuted, fontSize: 13, textAlign: 'center', marginTop: 24 },
 
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#16213e',
+    borderBottomColor: C.border,
     position: 'relative',
   },
   statValue: {
     width: 52,
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'left',
@@ -187,8 +192,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginHorizontal: 8,
   },
-  barHome: { backgroundColor: '#e2b96f', minWidth: 2 },
-  barAway: { backgroundColor: '#0f3460', minWidth: 2 },
+  barHome: { backgroundColor: C.green, minWidth: 2 },
+  barAway: { backgroundColor: C.red, minWidth: 2 },
   labelBox: {
     position: 'absolute',
     left: 0,
@@ -197,10 +202,10 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   statLabel: {
-    color: '#64748b',
+    color: C.textMuted,
     fontSize: 11,
     textAlign: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: C.bgCard,
     paddingHorizontal: 4,
   },
 });

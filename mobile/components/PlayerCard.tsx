@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Player } from '../types/player';
 import { formatValue } from '../services/squadService';
+import { C } from '../constants/theme';
 
 const POSITION_COLORS: Record<string, string> = {
   GK: '#f59e0b',
@@ -57,11 +58,13 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   overallBadge: {
     width: 44,
@@ -80,7 +83,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    color: '#f1f5f9',
+    color: C.textPrimary,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 4,
@@ -101,11 +104,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   detail: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 12,
   },
   value: {
-    color: '#e2b96f',
+    color: C.gold,
     fontSize: 13,
     fontWeight: '600',
   },

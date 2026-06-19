@@ -37,6 +37,7 @@ import {
 } from '../services/careerService';
 import { useAuthStore } from '../store/authStore';
 import AuthModal from '../components/AuthModal';
+import { C } from '../constants/theme';
 
 const COUNTRIES = [
   { label: 'Todos os Times', value: '' },
@@ -97,7 +98,7 @@ function SavesList({ onRestore }: SavesListProps) {
   }
 
   if (loading) {
-    return <ActivityIndicator color="#e2b96f" style={{ marginTop: 16 }} />;
+    return <ActivityIndicator color={C.green} style={{ marginTop: 16 }} />;
   }
 
   if (saves.length === 0 && !error) {
@@ -125,7 +126,7 @@ function SavesList({ onRestore }: SavesListProps) {
               disabled={restoringId !== null}
             >
               {restoringId === s.id
-                ? <ActivityIndicator color="#e2b96f" size="small" />
+                ? <ActivityIndicator color={C.green} size="small" />
                 : <Text style={styles.saveBtnText}>Carregar</Text>
               }
             </TouchableOpacity>
@@ -420,7 +421,7 @@ export default function LeagueScreen() {
 
           <AccountBanner onLogin={() => setAuthModalVisible(true)} />
 
-          {careerLoading && <ActivityIndicator color="#e2b96f" style={{ marginBottom: 16 }} />}
+          {careerLoading && <ActivityIndicator color={C.green} style={{ marginBottom: 16 }} />}
 
           {/* Career mode block */}
           {token && !careerLoading && (
@@ -450,7 +451,7 @@ export default function LeagueScreen() {
                   disabled={loading}
                 >
                   {loading
-                    ? <ActivityIndicator color="#1a1a2e" />
+                    ? <ActivityIndicator color={C.bg} />
                     : <Text style={styles.btnText}>Iniciar Carreira</Text>
                   }
                 </TouchableOpacity>
@@ -482,7 +483,7 @@ export default function LeagueScreen() {
             disabled={loading}
           >
             {loading
-              ? <ActivityIndicator color="#e2b96f" />
+              ? <ActivityIndicator color={C.green} />
               : <Text style={[styles.btnText, styles.btnOutlineText]}>Jogar Partida Rápida</Text>
             }
           </TouchableOpacity>
@@ -529,7 +530,7 @@ export default function LeagueScreen() {
                 style={styles.resetBtn}
                 onPress={() => setAuthModalVisible(true)}
               >
-                <Text style={[styles.resetBtnText, { color: '#e2b96f' }]}>Login</Text>
+                <Text style={[styles.resetBtnText, { color: C.green }]}>Login</Text>
               </TouchableOpacity>
             )}
             {!isCareerLeague && (
@@ -539,7 +540,7 @@ export default function LeagueScreen() {
                 disabled={saveLoading}
               >
                 {saveLoading
-                  ? <ActivityIndicator color="#e2b96f" size="small" />
+                  ? <ActivityIndicator color={C.green} size="small" />
                   : <Text style={styles.saveHeaderBtnText}>Salvar</Text>
                 }
               </TouchableOpacity>
@@ -567,7 +568,7 @@ export default function LeagueScreen() {
               disabled={loading}
             >
               {loading
-                ? <ActivityIndicator color="#1a1a2e" />
+                ? <ActivityIndicator color={C.bg} />
                 : <Text style={styles.btnText}>Jogar Rodada</Text>
               }
             </TouchableOpacity>
@@ -594,7 +595,7 @@ export default function LeagueScreen() {
                 disabled={loading}
               >
                 {loading
-                  ? <ActivityIndicator color="#1a1a2e" />
+                  ? <ActivityIndicator color={C.bg} />
                   : <Text style={styles.nextSeasonBtnText}>Próxima Temporada →</Text>
                 }
               </TouchableOpacity>
@@ -754,11 +755,11 @@ function AnalyticsTable({ teams }: { teams: TeamAnalytics[] }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1a1a2e', position: 'relative' },
+  safe: { flex: 1, backgroundColor: C.bg, position: 'relative' },
   container: { padding: 16, paddingBottom: 48 },
 
-  header: { color: '#f1f5f9', fontSize: 26, fontWeight: 'bold' },
-  subheader: { color: '#94a3b8', fontSize: 13, marginTop: 2 },
+  header: { color: C.textPrimary, fontSize: 26, fontWeight: 'bold' },
+  subheader: { color: C.textMuted, fontSize: 13, marginTop: 2 },
 
   seasonHeader: {
     flexDirection: 'row',
@@ -769,7 +770,7 @@ const styles = StyleSheet.create({
   headerBtns: { flexDirection: 'row', gap: 8, alignItems: 'center' },
 
   sectionLabel: {
-    color: '#94a3b8',
+    color: C.textMuted,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
@@ -783,15 +784,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
   },
-  chipActive: { backgroundColor: '#e2b96f' },
-  chipText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
-  chipTextActive: { color: '#1a1a2e' },
+  chipActive: { backgroundColor: C.green },
+  chipText: { color: C.textMuted, fontSize: 14, fontWeight: '600' },
+  chipTextActive: { color: C.bg },
 
   btnRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
   btn: {
-    backgroundColor: '#e2b96f',
+    backgroundColor: C.green,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -800,75 +801,81 @@ const styles = StyleSheet.create({
   },
   btnHalf: { flex: 1 },
   btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
+  btnText: { color: C.bg, fontSize: 15, fontWeight: 'bold' },
   btnOutline: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#e2b96f',
+    borderColor: C.green,
   },
-  btnOutlineText: { color: '#e2b96f' },
+  btnOutlineText: { color: C.green },
 
   resetBtn: {
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: C.border,
   },
-  resetBtnText: { color: '#94a3b8', fontSize: 13 },
+  resetBtnText: { color: C.textMuted, fontSize: 13 },
 
   saveHeaderBtn: {
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2b96f',
+    borderColor: C.green,
     minWidth: 64,
     alignItems: 'center',
   },
-  saveHeaderBtnText: { color: '#e2b96f', fontSize: 13, fontWeight: '600' },
+  saveHeaderBtnText: { color: C.green, fontSize: 13, fontWeight: '600' },
 
   doneCard: {
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.greenDim,
   },
-  doneText: { color: '#e2b96f', fontSize: 18, fontWeight: 'bold' },
-  doneSubtext: { color: '#f1f5f9', fontSize: 14, marginTop: 4 },
+  doneText: { color: C.gold, fontSize: 18, fontWeight: 'bold' },
+  doneSubtext: { color: C.textPrimary, fontSize: 14, marginTop: 4 },
 
   nextSeasonBtn: {
     marginTop: 14,
-    backgroundColor: '#e2b96f',
+    backgroundColor: C.green,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 32,
   },
-  nextSeasonBtnText: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
+  nextSeasonBtnText: { color: C.bg, fontSize: 15, fontWeight: 'bold' },
 
   // Career banner
   careerBanner: {
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  careerBannerTitle: { color: '#e2b96f', fontSize: 16, fontWeight: 'bold' },
-  careerBannerSub: { color: '#94a3b8', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  careerBannerTitle: { color: C.green, fontSize: 16, fontWeight: 'bold' },
+  careerBannerSub: { color: C.textMuted, fontSize: 13, marginTop: 4, lineHeight: 18 },
 
   // Promotion/Relegation card
   promRelCard: {
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: C.greenDim,
   },
-  promRelTitle: { color: '#e2b96f', fontSize: 15, fontWeight: 'bold', marginBottom: 4 },
-  promRelChampion: { color: '#f1f5f9', fontSize: 14, marginBottom: 2 },
-  promRelRelText: { color: '#ef4444', fontSize: 13, marginBottom: 2 },
-  promRelProText: { color: '#4ade80', fontSize: 13, marginBottom: 2 },
-  promRelNew: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
+  promRelTitle: { color: C.gold, fontSize: 15, fontWeight: 'bold', marginBottom: 4 },
+  promRelChampion: { color: C.textPrimary, fontSize: 14, marginBottom: 2 },
+  promRelRelText: { color: C.red, fontSize: 13, marginBottom: 2 },
+  promRelProText: { color: C.green, fontSize: 13, marginBottom: 2 },
+  promRelNew: { color: C.textMuted, fontSize: 12, marginTop: 4 },
 
   // Season history
   historyRow: {
@@ -878,24 +885,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: C.border,
   },
   historyLeft: { flex: 1 },
   historyRight: { alignItems: 'flex-end' },
-  historyTitle: { color: '#f1f5f9', fontSize: 14, fontWeight: '600' },
-  historyChampion: { color: '#e2b96f', fontSize: 13, marginTop: 2 },
-  historyPos: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  historyRelLabel: { color: '#ef4444', fontSize: 12 },
-  historyProLabel: { color: '#4ade80', fontSize: 12 },
+  historyTitle: { color: C.textPrimary, fontSize: 14, fontWeight: '600' },
+  historyChampion: { color: C.gold, fontSize: 13, marginTop: 2 },
+  historyPos: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+  historyRelLabel: { color: C.red, fontSize: 12 },
+  historyProLabel: { color: C.green, fontSize: 12 },
 
-  errorText: { color: '#ef4444', textAlign: 'center', marginVertical: 8, fontSize: 14 },
-  successText: { color: '#4ade80', textAlign: 'center', marginVertical: 8, fontSize: 14 },
-  muted: { color: '#64748b', fontSize: 14, paddingVertical: 8 },
+  errorText: { color: C.red, textAlign: 'center', marginVertical: 8, fontSize: 14 },
+  successText: { color: C.green, textAlign: 'center', marginVertical: 8, fontSize: 14 },
+  muted: { color: C.textMuted, fontSize: 14, paddingVertical: 8 },
 
   card: {
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.border,
   },
 
   // Standings table
@@ -905,20 +914,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: C.border,
   },
-  tableHeaderRow: { backgroundColor: '#0f3460' },
-  tableRowTop: { borderLeftWidth: 3, borderLeftColor: '#e2b96f' },
-  tableRowBottom: { borderLeftWidth: 3, borderLeftColor: '#ef4444' },
+  tableHeaderRow: { backgroundColor: C.bgSurface },
+  tableRowTop: { borderLeftWidth: 3, borderLeftColor: C.green },
+  tableRowBottom: { borderLeftWidth: 3, borderLeftColor: C.red },
 
   colPos: { width: 22, textAlign: 'center' },
   colName: { flex: 1, paddingHorizontal: 6 },
   colStat: { width: 28, textAlign: 'center' },
   colPts: { width: 34, textAlign: 'center' },
 
-  colHeader: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
-  cellText: { color: '#f1f5f9', fontSize: 13 },
-  cellPts: { color: '#e2b96f', fontSize: 13, fontWeight: 'bold' },
+  colHeader: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
+  cellText: { color: C.textPrimary, fontSize: 13 },
+  cellPts: { color: C.gold, fontSize: 13, fontWeight: 'bold' },
 
   // Results
   resultRow: {
@@ -927,44 +936,48 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: C.border,
   },
-  resultTeam: { flex: 1, color: '#94a3b8', fontSize: 13 },
+  resultTeam: { flex: 1, color: C.textMuted, fontSize: 13 },
   resultTeamRight: { textAlign: 'right' },
-  resultWinner: { color: '#f1f5f9', fontWeight: '700' },
+  resultWinner: { color: C.textPrimary, fontWeight: '700' },
   resultScoreWrap: { alignItems: 'center', paddingHorizontal: 12, minWidth: 70 },
   resultScore: {
-    color: '#e2b96f',
+    color: C.gold,
     fontSize: 15,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  resultStatsHint: { color: '#334155', fontSize: 10, marginTop: 2 },
+  resultStatsHint: { color: C.borderLight, fontSize: 10, marginTop: 2 },
 
   // Account banner
   loginBanner: {
-    backgroundColor: '#0f3460',
+    backgroundColor: C.bgSurface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  loginBannerText: { color: '#94a3b8', fontSize: 13, flex: 1 },
-  loginBannerAction: { color: '#e2b96f', fontSize: 13, fontWeight: '700', marginLeft: 8 },
+  loginBannerText: { color: C.textMuted, fontSize: 13, flex: 1 },
+  loginBannerAction: { color: C.green, fontSize: 13, fontWeight: '700', marginLeft: 8 },
 
   accountBanner: {
-    backgroundColor: '#16213e',
+    backgroundColor: C.bgCard,
     borderRadius: 10,
     padding: 14,
     marginBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  accountBannerText: { color: '#4ade80', fontSize: 13, fontWeight: '600' },
-  accountBannerAction: { color: '#94a3b8', fontSize: 13 },
+  accountBannerText: { color: C.green, fontSize: 13, fontWeight: '600' },
+  accountBannerAction: { color: C.textMuted, fontSize: 13 },
 
   // Saves list
   saveRow: {
@@ -973,18 +986,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: C.border,
   },
-  saveLabel: { color: '#f1f5f9', fontSize: 14, fontWeight: '600' },
-  saveDate: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  saveLabel: { color: C.textPrimary, fontSize: 14, fontWeight: '600' },
+  saveDate: { color: C.textMuted, fontSize: 12, marginTop: 2 },
   saveBtn: {
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2b96f',
+    borderColor: C.green,
     minWidth: 80,
     alignItems: 'center',
   },
-  saveBtnText: { color: '#e2b96f', fontSize: 13, fontWeight: '600' },
+  saveBtnText: { color: C.green, fontSize: 13, fontWeight: '600' },
 });
