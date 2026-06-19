@@ -8,7 +8,9 @@ export interface Team {
   budget: number;
 }
 
-export type MatchEventType = 'goal' | 'shot' | 'yellow_card' | 'red_card';
+export type MatchEventType =
+  | 'goal' | 'shot' | 'yellow_card' | 'red_card'
+  | 'corner' | 'foul' | 'dangerous_attack' | 'counter_attack' | 'half_time';
 
 export interface MatchEvent {
   minute: number;

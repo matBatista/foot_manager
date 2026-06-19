@@ -101,6 +101,7 @@ func main() {
 	market := v1.Group("/market", middleware.RequireAuth(jwtSecret))
 	market.Get("/budget", marketHandler.Budget)
 	market.Get("/available", marketHandler.Available)
+	market.Get("/window", marketHandler.Window)
 	market.Post("/buy/:player_id", marketHandler.Buy)
 	market.Post("/sell/:player_id", marketHandler.Sell)
 

@@ -47,6 +47,7 @@ export interface ResultRow {
   away_goals: number;
   home_stats?: MatchStats;
   away_stats?: MatchStats;
+  events?: import('./matchService').MatchEvent[];
 }
 
 export interface TeamAnalytics {

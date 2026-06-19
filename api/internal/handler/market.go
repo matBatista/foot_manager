@@ -104,6 +104,42 @@ func (h *MarketHandler) Buy(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"budget": newBudget})
 }
 
+// Window returns whether the transfer window is currently open for the
+// authenticated manager.
+// GET /api/v1/market/window
+func (h *MarketHandler) Window(c *fiber.Ctx) error {
+	managerID := middleware.ManagerID(c)
+	open := true
+	currentRound := 0
+	message := "Janela de transferências aberta."
+
+	if h.careers != nil && h.league != nil && managerID != "" {
+		career, err := h.careers.GetByManagerID(c.Context(), managerID)
+		if err == nil && career.ActiveLeagueID != "" {
+			if st, ok := h.league.lookupOrLoad(c.Context(), career.ActiveLeagueID); ok {
+				h.league.mu.Lock()
+				nr := st.season.NextRound() - 1
+				if nr < 1 {
+					nr = 1
+				}
+				currentRound = nr
+				h.league.mu.Unlock()
+
+				if !isTransferWindowOpen(currentRound) {
+					open = false
+					message = "Janela de transferências fechada. Abre nas rodadas 1–5 e 19–21."
+				}
+			}
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"open":          open,
+		"current_round": currentRound,
+		"message":       message,
+	})
+}
+
 // Sell releases a player from the manager's squad (player becomes a free agent).
 // POST /api/v1/market/sell/:player_id
 func (h *MarketHandler) Sell(c *fiber.Ctx) error {
